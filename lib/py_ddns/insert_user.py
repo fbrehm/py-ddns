@@ -11,20 +11,39 @@
 import sys 
 import os
 import cgi
+import logging
 
 # Third party modules
 
 # Own modules
+import pb_base
+from pb_base.common import pp
 
+from pb_base.errors import PbError
+
+from pb_base.object import PbBaseObjectError
+
+from pb_base.app import PbApplicationError
+
+from pb_base.cfg_app import PbCfgAppError
+
+from py_ddns.cgi_base import CgiAppError
+
+from py_ddns.dyndns_app import DynDnsAppError
+from py_ddns.dyndns_app import DynDnsApp
 
 __version__ = '0.1.0'
 
 
 #==============================================================================
-class DynDnsInsertUserApp(object):
+class DynDnsInsertUserApp(DynDnsApp):
 
     def __init__(self):
-        self.verbose = 2
+
+        super(DynDnsInsertUserApp, self).__init__(
+                appname = 'insert_user',
+                initialized = False,
+        )
 
     def __call__(self):
 
