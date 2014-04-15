@@ -13,6 +13,8 @@ import os
 import cgi
 import cgitb
 import logging
+import time
+import datetime
 
 # Third party modules
 import argparse
@@ -53,6 +55,10 @@ class CgiApp(PbCfgApp):
     crlf = '\015\012'
     re_unfold = re.compile(crlf + r'(\s)')
     re_has_linebreaks = re.compile(crlf + '|\015|\012')
+    re_int = re.compile(r'^\s*(\d+)')
+    re_expire_diff = re.compile(r'([+-]?(?:\d+|\d*\.\d*))([smhdMy])')
+
+    nph = False
 
     #--------------------------------------------------------------------------
     def __init__(self,
@@ -149,6 +155,7 @@ class CgiApp(PbCfgApp):
         )
 
         self._header_printed = 0
+        self._charset = 'ISO-8859-1'
 
         self.cgi_form = cgi.FieldStorage()
 
@@ -173,6 +180,16 @@ class CgiApp(PbCfgApp):
     @header_printed.setter
     def header_printed(self, value):
         self._header_printed = int(value)
+
+    #------------------------------------------------------------
+    @property
+    def charset(self):
+        """The used charcter set."""
+        return self._charset
+
+    @charset.setter
+    def charset(self, value):
+        self._charset = str(value).strip()
 
     #--------------------------------------------------------------------------
     def as_dict(self, short = False):
@@ -233,7 +250,7 @@ class CgiApp(PbCfgApp):
 
     #--------------------------------------------------------------------------
     def header(self, ctype = None, status = None, cookie = None,
-            target = None, expires = None, charset = None, *others):
+            target = None, expires = None, nph = None, charset = None, *others):
         """
         Return a Content-Type: style header
         """
@@ -242,6 +259,8 @@ class CgiApp(PbCfgApp):
             self.header_printed += 1
             if self.headers_once:
                 return ''
+
+        headers = []
 
         # Normalize cookies
         cookies = []
@@ -278,6 +297,9 @@ class CgiApp(PbCfgApp):
         if expires:
             expires = unfold(expires, "Expires")
 
+        if nph:
+            nph = unfold(nph, "NPH")
+
         if charset:
             charset = unfold(charset, "Target")
 
@@ -285,6 +307,82 @@ class CgiApp(PbCfgApp):
         for c in others:
             others[i] = unfold(c, "Other")
             i += 1
+
+        # Normalize NPH
+        if nph:
+            nph = bool(nph)
+        else:
+            nph = self.nph
+
+        # Default content type, if not given
+        if not ctype:
+            ctype = 'text/html'
+
+        # Set charset, if given
+        if charset:
+            self.charset = charset
+        charset = self.charset
+
+    #--------------------------------------------------------------------------
+    def _calc_expire_date(self, etime = None):
+        """
+        Creates an expires time exactly some number of hours from the current time.
+
+        format for etime can be in any of the forms...
+        "now" -- expire immediately
+        "+180s" -- in 180 seconds
+        "+2m" -- in 2 minutes
+        "+12h" -- in 12 hours
+        "+1d"  -- in 1 day
+        "+3M"  -- in 3 months
+        "+2y"  -- in 2 years
+        "-3m"  -- 3 minutes ago(!)
+
+        """
+
+        offset = 0
+        mult = {
+                's': 1,
+                'm': 60,
+                'h': 60 * 60,
+                'd': 60 * 60 * 24,
+                'M': 60 * 60 * 24 * 30,
+                'y': 60 * 60 * 24 * 365,
+        }
+
+        if isinstance(etime, int):
+            return etime
+
+        if isinstance(etime, float):
+            return int(etime)
+
+        if etime is None:
+            offset = 0
+        elif isinstance(etime, str):
+            match = re_int.search(etime)
+            if match:
+                return int(match.group(1))
+            if etime.lower() == 'now':
+                offset = 0
+            else:
+                match = re_expire_diff.search(etime)
+                if match:
+                    factor = 1.0
+                    base = float(match.group(1))
+                    unit = match.group(2)
+                    if unit in mult:
+                        factor = float(mult[unit])
+                    offset = int(base * factor)
+                else:
+                    return etime
+        else:
+            return etime
+
+        return time.time() + offset
+
+    #--------------------------------------------------------------------------
+#    def format_expire_date(self, etime = None):
+#        """
 
 
 #==============================================================================
