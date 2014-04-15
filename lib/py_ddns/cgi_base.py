@@ -42,6 +42,19 @@ class CgiApp(PbCfgApp):
     """Base class for all CGI applications."""
 
     #--------------------------------------------------------------------------
+    # Class variables
+
+    headers_once = False
+    """
+    @cvar: suppress redundant HTTP headers
+    @type: bool
+    """
+
+    crlf = '\015\012'
+    re_unfold = re.compile(crlf + r'(\s)')
+    re_has_linebreaks = re.compile(crlf + '|\015|\012')
+
+    #--------------------------------------------------------------------------
     def __init__(self,
                 appname = None,
                 verbose = 0,
@@ -135,6 +148,8 @@ class CgiApp(PbCfgApp):
                 need_config_file = False,
         )
 
+        self._header_printed = 0
+
         self.cgi_form = cgi.FieldStorage()
 
     #------------------------------------------------------------
@@ -148,6 +163,16 @@ class CgiApp(PbCfgApp):
     def trace2stdout(self):
         """Flag showing, that all trace data should go to STDOUT."""
         return self._trace2stdout
+
+    #------------------------------------------------------------
+    @property
+    def header_printed(self):
+        """How often was the HTTP header printed."""
+        return self._header_printed
+
+    @header_printed.setter
+    def header_printed(self, value):
+        self._header_printed = int(value)
 
     #--------------------------------------------------------------------------
     def as_dict(self, short = False):
@@ -205,6 +230,62 @@ class CgiApp(PbCfgApp):
         root_log.addHandler(lh_console)
 
         return
+
+    #--------------------------------------------------------------------------
+    def header(self, ctype = None, status = None, cookie = None,
+            target = None, expires = None, charset = None, *others):
+        """
+        Return a Content-Type: style header
+        """
+
+        if self.header_printed:
+            self.header_printed += 1
+            if self.headers_once:
+                return ''
+
+        # Normalize cookies
+        cookies = []
+        if isinstance(cookie, list) or isinstance(cookie, tuple):
+            for c in cookie:
+                cookies.append(str(c))
+        else:
+            cookies.append(str(cookie))
+
+        #--------------------------------
+        # Unfolding
+        def unfold(value, what):
+            unfolded = self.re_unfold.sub(r'\1', value)
+            if self.re_has_linebreaks.search(unfolded):
+                msg = ("Invalid header value of %r contains a newline not " +
+                        "followed by whitespace: %r") % (what, unfolded)
+                raise ValueError(msg)
+            return unfolded
+
+        if ctype:
+            ctype = unfold(ctype, "Content-type")
+
+        if status:
+            status = unfold(status, "Status")
+
+        i = 0
+        for c in cookies:
+            cookies[i] = unfold(c, "Cookie")
+            i += 1
+
+        if target:
+            target = unfold(target, "Target")
+
+        if expires:
+            expires = unfold(expires, "Expires")
+
+        if charset:
+            charset = unfold(charset, "Target")
+
+        i = 0
+        for c in others:
+            others[i] = unfold(c, "Other")
+            i += 1
+
 
 #==============================================================================
 
