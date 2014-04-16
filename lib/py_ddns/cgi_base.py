@@ -52,11 +52,27 @@ class CgiApp(PbCfgApp):
     @type: bool
     """
 
+    dtd_public_identifier = ''
+
     crlf = '\015\012'
     re_unfold = re.compile(crlf + r'(\s)')
     re_has_linebreaks = re.compile(crlf + '|\015|\012')
     re_int = re.compile(r'^\s*(\d+)')
     re_expire_diff = re.compile(r'([+-]?(?:\d+|\d*\.\d*))([smhdMy])')
+
+    re_amp_sign = re.compile(r'&', re.DOTALL)
+    re_lt_sign = re.compile(r'<', re.DOTALL)
+    re_gt_sign = re.compile(r'>', re.DOTALL)
+    re_dquot_sign = re.compile(r'"', re.DOTALL)
+    re_squot_sign = re.compile(r"'", re.DOTALL)
+    re_hex_8b = re.compile("\x8b", re.DOTALL)
+    re_hex_9b = re.compile("\x9b", re.DOTALL)
+    re_oct_12 = re.compile('\012', re.DOTALL)
+    re_oct_15 = re.compile('\015', re.DOTALL)
+    re_html_3_2 = re.compile(r'[^X]HTML 3\.2', re.IGNORECASE)
+
+    re_islatin = re.compile(r'^(ISO-8859-1|WINDOWS-1252)$',
+            re.IGNORECASE)
 
     nph = False
 
@@ -191,6 +207,16 @@ class CgiApp(PbCfgApp):
     def charset(self, value):
         self._charset = str(value).strip()
 
+    #------------------------------------------------------------
+    @property
+    def islatin(self):
+        """Is the current character set a latin charset?"""
+        if self.charset is None:
+            return True
+        if re_islatin.search(self.charset):
+            return True
+        return False
+
     #--------------------------------------------------------------------------
     def as_dict(self, short = False):
         """
@@ -322,6 +348,43 @@ class CgiApp(PbCfgApp):
         if charset:
             self.charset = charset
         charset = self.charset
+
+    #--------------------------------------------------------------------------
+    def escape_html(self, toencode, newlinestoo = False):
+        """Escape HTML"""
+
+        if toencode is None:
+            return None
+
+        toencode = re_amp_sign.sub('&amp;', toencode)
+        toencode = re_lt_sign.sub('&lt;', toencode)
+        toencode = re_gt_sign.sub('&gt;', toencode)
+
+        if re_html_3_2.search(self.dtd_public_identifier):
+            toencode = re_dquot_sign.sub('&#34;', toencode)
+        else:
+            toencode = re_dquot_sign.sub('&quot;', toencode)
+
+        if self.charset and self.islatin:
+            toencode = re_squot_sign.sub('&#39;', toencode)
+            toencode = re_hex_8b.sub('&#8249;', toencode)
+            toencode = re_hex_9b.sub('&#8250;', toencode)
+            if newlinestoo:
+                toencode = re_oct_12.sub('&#10;', toencode)
+                toencode = re_oct_15.sub('&#13;', toencode)
+
+        return toencode
+
+    #--------------------------------------------------------------------------
+    def unescape_html(self, to_unescape):
+        """Unescape HTML"""
+
+        if to_unescape is None:
+            return None
+
+        unescaped = to_unescape
+
+        return unescaped
 
     #--------------------------------------------------------------------------
     def _calc_expire_date(self, etime = None):
