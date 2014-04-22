@@ -45,10 +45,15 @@ class DynDnsInsertUserApp(DynDnsApp):
                 initialized = False,
         )
 
+        self.nph = True
+        self.charset = 'UTF-8'
+        self.post_init()
+
     def __call__(self):
 
-        print("Content-Type: text/plain")
-        cgi.print_environ()
+        sys.stdout.write(self.header())
+        sys.stdout.flush()
+        #cgi.print_environ()
 
 
 #==============================================================================

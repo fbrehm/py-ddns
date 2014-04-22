@@ -10,11 +10,13 @@
 # Standard modules
 import sys 
 import os
+import re
 import cgi
 import cgitb
 import logging
 import time
 import datetime
+import locale
 
 # Third party modules
 import argparse
@@ -31,6 +33,8 @@ from pb_base.app import PbApplicationError
 
 from pb_base.cfg_app import PbCfgAppError
 from pb_base.cfg_app import PbCfgApp
+
+log = logging.getLogger(__name__)
 
 __version__ = '0.1.0'
 
@@ -73,6 +77,12 @@ class CgiApp(PbCfgApp):
 
     re_islatin = re.compile(r'^(ISO-8859-1|WINDOWS-1252)$',
             re.IGNORECASE)
+    re_escaped_html = re.compile(r"&([^\s&]*?);")
+    re_dec_entity = re.compile(r"#(\d+)$")
+    re_hex_entity = re.compile(r"#x([0-9a-f]+)$", re.IGNORECASE)
+
+    re_header = re.compile(r'([^ \r\n\t=]+)=\"?(.+?)\"?$')
+    re_charset = re.compile(r'\bcharset\b')
 
     nph = False
 
@@ -173,6 +183,8 @@ class CgiApp(PbCfgApp):
         self._header_printed = 0
         self._charset = 'ISO-8859-1'
 
+        self._cache = False
+
         self.cgi_form = cgi.FieldStorage()
 
     #------------------------------------------------------------
@@ -209,13 +221,32 @@ class CgiApp(PbCfgApp):
 
     #------------------------------------------------------------
     @property
+    def cache(self):
+        """
+        Control whether header() will produce the no-cache Pragma directive.
+        """
+        return self._cache
+
+    @cache.setter
+    def cache(self, value):
+        self._cache = bool(value)
+
+    #------------------------------------------------------------
+    @property
     def islatin(self):
         """Is the current character set a latin charset?"""
         if self.charset is None:
             return True
-        if re_islatin.search(self.charset):
+        if self.re_islatin.search(self.charset):
             return True
         return False
+
+    #--------------------------------------------------------------------------
+    def server_software(self):
+
+        if 'SERVER_SOFTWARE' in os.environ and os.environ['SERVER_SOFTWARE']:
+            return os.environ['SERVER_SOFTWARE']
+        return 'cmdline'
 
     #--------------------------------------------------------------------------
     def as_dict(self, short = False):
@@ -231,6 +262,11 @@ class CgiApp(PbCfgApp):
 
         res = super(CgiApp, self).as_dict(short = short)
         res['is_cgi'] = self.is_cgi
+        res['header_printed'] = self.header_printed
+        res['charset'] = self.charset
+        res['headers_once'] = self.headers_once
+        res['dtd_public_identifier'] = self.dtd_public_identifier
+        res['nph'] = self.nph
 
         return res
 
@@ -293,7 +329,7 @@ class CgiApp(PbCfgApp):
         if isinstance(cookie, list) or isinstance(cookie, tuple):
             for c in cookie:
                 cookies.append(str(c))
-        else:
+        elif cookie:
             cookies.append(str(cookie))
 
         #--------------------------------
@@ -306,6 +342,7 @@ class CgiApp(PbCfgApp):
                 raise ValueError(msg)
             return unfolded
 
+        # Check parameters
         if ctype:
             ctype = unfold(ctype, "Content-type")
 
@@ -331,7 +368,14 @@ class CgiApp(PbCfgApp):
 
         i = 0
         for c in others:
-            others[i] = unfold(c, "Other")
+            hdr = unfold(c, "Other")
+            match = self.re_header.search(hdr)
+            if match:
+                hdr_name = match.group(1)
+                value = match.group(2)
+                hdr = (hdr_name[0:1].upper() + hdr_name[1:].lower() + ': ' +
+                        self.unescape_html(value))
+            others[i] = hdr
             i += 1
 
         # Normalize NPH
@@ -349,6 +393,43 @@ class CgiApp(PbCfgApp):
             self.charset = charset
         charset = self.charset
 
+        if ctype and (not self.re_charset.search(ctype)) and charset:
+            ctype += "; charset=%s" % (charset)
+
+        protocol = 'HTTP/1.0'
+        if 'SERVER_PROTOCOL' in os.environ and os.environ['SERVER_PROTOCOL']:
+            protocol = os.environ['SERVER_PROTOCOL']
+
+        if nph:
+            nph_status = '200 OK'
+            if status:
+                nph_status = status
+            headers.append("%s %s" % (protocol, nph_status))
+            headers.append("Server: %s" % (self.server_software()))
+
+        if status:
+            headers.append("Status: %s" % (status))
+        if target:
+            headers.append("Window-Target: %s" % (target))
+
+        if cookies:
+            for c in cookies:
+                headers.append("Set-Cookie: %s" % (c))
+
+        if expires:
+            headers.append("Expires: %s" % (
+                    self.format_expire_date(expires, False)))
+        if expires or cookies or nph:
+            headers.append("Date: %s" % (self.format_expire_date(0, False)))
+        if self.cache:
+            headers.append("Pragma: no-cache")
+        for hdr in others:
+            headers.append(hdr[0:1].upper() + hdr[1:])
+        if ctype:
+            headers.append("Content-Type: %s" % (ctype))
+
+        return self.crlf.join(headers) + self.crlf + self.crlf
+
     #--------------------------------------------------------------------------
     def escape_html(self, toencode, newlinestoo = False):
         """Escape HTML"""
@@ -356,22 +437,22 @@ class CgiApp(PbCfgApp):
         if toencode is None:
             return None
 
-        toencode = re_amp_sign.sub('&amp;', toencode)
-        toencode = re_lt_sign.sub('&lt;', toencode)
-        toencode = re_gt_sign.sub('&gt;', toencode)
+        toencode = self.re_amp_sign.sub('&amp;', toencode)
+        toencode = self.re_lt_sign.sub('&lt;', toencode)
+        toencode = self.re_gt_sign.sub('&gt;', toencode)
 
-        if re_html_3_2.search(self.dtd_public_identifier):
-            toencode = re_dquot_sign.sub('&#34;', toencode)
+        if self.re_html_3_2.search(self.dtd_public_identifier):
+            toencode = self.re_dquot_sign.sub('&#34;', toencode)
         else:
-            toencode = re_dquot_sign.sub('&quot;', toencode)
+            toencode = self.re_dquot_sign.sub('&quot;', toencode)
 
         if self.charset and self.islatin:
-            toencode = re_squot_sign.sub('&#39;', toencode)
-            toencode = re_hex_8b.sub('&#8249;', toencode)
-            toencode = re_hex_9b.sub('&#8250;', toencode)
+            toencode = self.re_squot_sign.sub('&#39;', toencode)
+            toencode = self.re_hex_8b.sub('&#8249;', toencode)
+            toencode = self.re_hex_9b.sub('&#8250;', toencode)
             if newlinestoo:
-                toencode = re_oct_12.sub('&#10;', toencode)
-                toencode = re_oct_15.sub('&#13;', toencode)
+                toencode = self.re_oct_12.sub('&#10;', toencode)
+                toencode = self.re_oct_15.sub('&#13;', toencode)
 
         return toencode
 
@@ -382,9 +463,72 @@ class CgiApp(PbCfgApp):
         if to_unescape is None:
             return None
 
-        unescaped = to_unescape
+        latin = True
+        if self.charset is not None:
+            if not self.islatin:
+                latin = False
+
+        #-----------------
+        def unescaped_char(matchobj):
+
+            c = matchobj.group(1)
+
+            if c == 'amp':
+                return '&'
+
+            if c == 'quot':
+                return '"'
+
+            if c == 'gt':
+                return '>'
+
+            if c == 'lt':
+                return '<'
+
+            if latin:
+
+                ent_match = self.re_dec_entity.search(c)
+                if ent_match:
+                    number = int(ent_match.group(1))
+                    return chr(number)
+
+                ent_match = self.re_hex_entity.search(c)
+                if ent_match:
+                    number = int(ent_match.group(1), 16)
+                    return chr(number)
+
+            return '&%s;' % (c)
+
+        unescaped = self.re_escaped_html.sub(unescaped_char, to_unescape)
 
         return unescaped
+
+    #--------------------------------------------------------------------------
+    def format_expire_date(self, etime = None, format_cookie = False):
+        """
+        Creates date strings suitable for use in cookies and HTTP headers.
+        (They differ, unfortunately.)
+        """
+
+        etime = self._calc_expire_date(etime)
+        if not isinstance(etime, int):
+            return etime
+
+        sc = ' '
+        if format_cookie:
+            sc = '-'
+
+        dt = datetime.datetime.utcfromtimestamp(etime)
+
+        (lang_code, encoding) = locale.getlocale(locale.LC_TIME)
+        if lang_code:
+            locale.setlocale(locale.LC_TIME, 'C')
+
+        fmt = "%a, %d" + sc + "%b" + sc + "%Y %H:%M:%S GMT"
+        dt_formatted = dt.strftime(fmt)
+        if lang_code:
+            locale.setlocale(locale.LC_TIME, (lang_code, encoding))
+        return dt_formatted
 
     #--------------------------------------------------------------------------
     def _calc_expire_date(self, etime = None):
@@ -413,22 +557,32 @@ class CgiApp(PbCfgApp):
                 'y': 60 * 60 * 24 * 365,
         }
 
-        if isinstance(etime, int):
+        if self.verbose > 3:
+            log.debug("Calculating expire date from %r", etime)
+
+        if isinstance(etime, int) and etime != 0:
+            if self.verbose > 3:
+                log.debug("Returning %r", etime)
             return etime
 
         if isinstance(etime, float):
+            if self.verbose > 3:
+                log.debug("Returning %r", int(etime))
             return int(etime)
 
         if etime is None:
             offset = 0
         elif isinstance(etime, str):
-            match = re_int.search(etime)
+            match = self.re_int.search(etime)
             if match:
-                return int(match.group(1))
+                res = int(match.group(1))
+                if self.verbose > 3:
+                    log.debug("Returning %r", res)
+                return res
             if etime.lower() == 'now':
                 offset = 0
             else:
-                match = re_expire_diff.search(etime)
+                match = self.re_expire_diff.search(etime)
                 if match:
                     factor = 1.0
                     base = float(match.group(1))
@@ -437,16 +591,15 @@ class CgiApp(PbCfgApp):
                         factor = float(mult[unit])
                     offset = int(base * factor)
                 else:
+                    if self.verbose > 3:
+                        log.debug("Returning %r", etime)
                     return etime
-        else:
+        elif not isinstance(etime, int):
             return etime
 
-        return time.time() + offset
-
-    #--------------------------------------------------------------------------
-#    def format_expire_date(self, etime = None):
-#        """
-
+        if self.verbose > 3:
+            log.debug("Offset is %d.", offset)
+        return int(time.time()) + offset
 
 #==============================================================================
 

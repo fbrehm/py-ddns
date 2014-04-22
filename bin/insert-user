@@ -29,7 +29,7 @@ __copyright__ = '(C) 2010 - 2014 by Frank Brehm, Berlin'
 app = DynDnsInsertUserApp()
 
 if app.verbose > 2:
-    print((_("DynDnsInsertUserApp object:") + (("\n%s") % (app))))
+    print(("DynDnsInsertUserApp object:" + (("\n%s") % (app))))
 
 app()
 
