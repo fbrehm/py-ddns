@@ -18,6 +18,11 @@ import time
 import datetime
 import locale
 
+try:
+    from urllib.parse import quote, unquote
+except ImportError:
+    from urllib import quote, unquote
+
 # Third party modules
 import argparse
 
@@ -36,7 +41,7 @@ from pb_base.cfg_app import PbCfgApp
 
 log = logging.getLogger(__name__)
 
-__version__ = '0.1.0'
+__version__ = '0.2.0'
 
 #==============================================================================
 class CgiAppError(PbCfgAppError):
@@ -161,6 +166,9 @@ class CgiApp(PbCfgApp):
 
         self._trace2stdout = False
 
+        self._path_info = None
+        self._script_name = None
+
         super(CgiApp, self).__init__(
                 appname = appname,
                 verbose = verbose,
@@ -233,6 +241,90 @@ class CgiApp(PbCfgApp):
 
     #------------------------------------------------------------
     @property
+    def request_uri(self):
+        """The literal request URI."""
+        if 'REQUEST_URI' in os.environ and os.environ['REQUEST_URI']:
+            return os.environ['REQUEST_URI']
+        return None
+
+    #------------------------------------------------------------
+    @property
+    def name_and_path_from_env(self):
+        """Script name and path how given from environment."""
+
+        scriptname = ''
+        if 'SCRIPT_NAME' in os.environ and os.environ['SCRIPT_NAME']:
+            scriptname = os.environ['SCRIPT_NAME']
+
+        pathinfo = ''
+        if 'PATH_INFO' in os.environ and os.environ['PATH_INFO']:
+            pathinfo = os.environ['PATH_INFO']
+
+        uri = unquote(re.sub(r'\?.*', '', self.request_uri))
+
+        if uri != (scriptname + pathinfo):
+            re_escaped_slash = re.compile(r'(?:\\/)+')
+            script_name_pattern = re.escape(scriptname)
+            script_name_pattern = re_escaped_slash.sub('/+', script_name_pattern)
+            path_info_pattern = re.escape(pathinfo)
+            path_info_pattern = re_escaped_slash.sub('/+', path_info_pattern)
+
+            script_pattern = (r'^(' + script_name_pattern + ')(' +
+                    path_info_pattern + ')$')
+            match = re.search(script_pattern, uri, re.DOTALL)
+            if match:
+                scriptname = match.group(1)
+                pathinfo = match.group(2)
+
+        return (scriptname, pathinfo)
+
+    #------------------------------------------------------------
+    @property
+    def path_info(self):
+        """
+        The extra virtual path information provided after the URL (if any).
+        """
+        if self._path_info is None:
+            (scriptname, pathinfo) = self.name_and_path_from_env
+            self._path_info = pathinfo
+        return self._path_info
+
+    @path_info.setter
+    def path_info(self, value):
+        if value is None:
+            value = ''
+        else:
+            value = str(value)
+        if value != '' and not value.startswith('/'):
+            value = "/" + value
+        self._path_info = value
+
+    #------------------------------------------------------------
+    @property
+    def script_name(self):
+        """
+        The extra virtual path information provided after the URL (if any).
+        """
+        if self._script_name is None:
+            (scriptname, pathinfo) = self.name_and_path_from_env
+            self._script_name = scriptname
+        return self._script_name
+
+    @script_name.setter
+    def script_name(self, value):
+        if value is None:
+            v = ''
+        elif isinstance(value, (list, tuple)):
+            if len(value) > 0:
+                v = str(value.pop(0))
+            else:
+                v = ''
+        else:
+            v = str(value)
+        self._script_name = v
+
+    #------------------------------------------------------------
+    @property
     def islatin(self):
         """Is the current character set a latin charset?"""
         if self.charset is None:
@@ -247,6 +339,16 @@ class CgiApp(PbCfgApp):
         if 'SERVER_SOFTWARE' in os.environ and os.environ['SERVER_SOFTWARE']:
             return os.environ['SERVER_SOFTWARE']
         return 'cmdline'
+
+    #--------------------------------------------------------------------------
+    def escape_url(self, value):
+
+        return quote(value)
+
+    #--------------------------------------------------------------------------
+    def unescape_url(self, value):
+
+        return unquote(value)
 
     #--------------------------------------------------------------------------
     def as_dict(self, short = False):
@@ -429,6 +531,68 @@ class CgiApp(PbCfgApp):
             headers.append("Content-Type: %s" % (ctype))
 
         return self.crlf.join(headers) + self.crlf + self.crlf
+
+    #--------------------------------------------------------------------------
+    def redirect(self, url, target = None, status = None, cookie = None,
+            nph = None, *other):
+        """
+        Return a Location: style header
+        """
+
+        if not status:
+            status = '302 Found'
+
+
+    #--------------------------------------------------------------------------
+    def utf8_chr(self, c):
+        """
+        Transforms the given integer value to the the appropriate character.
+
+        @param c: the character value to transform
+        @type c: int
+
+        @return: the transformed character
+        @rtype: str
+
+        """
+
+        c_value = int(c)
+        if sys.version_info[0] > 2:
+            char = chr(c_value)
+        else:
+            char = unichr(c_value).encode('utf-8')
+
+        return char
+
+    #--------------------------------------------------------------------------
+    def url(self, absolute = False, relative = False, full = False,
+            pathinfo = False, query = False, base = False, rewrite = None):
+        """
+        Returns the script's URL in a variety of formats.  Called without any
+        arguments, it returns the full form of the URL, including host name
+        and port number::
+
+            http://your.host.com/path/to/script.cgi
+
+        @param absolute: If true, produce an absolute URL, e.g.::
+                            /path/to/script.cgi
+        @type absolute: bool
+
+        """
+
+        _url = ''
+
+        if base or not (absolute or relative):
+            full = True
+        if rewrite is None:
+            rewrite = True
+
+        path = self.path_info
+        script_name = self.script_name
+        request_uri = ''
+        if self.request_uri:
+            request_uri = unquote(self.request_uri)
+        query_str = self.query_str
 
     #--------------------------------------------------------------------------
     def escape_html(self, toencode, newlinestoo = False):
