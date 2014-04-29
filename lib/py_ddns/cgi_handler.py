@@ -229,6 +229,84 @@ class CgiHandler(PbBaseObject):
             return os.environ['REQUEST_URI']
         return None
 
+    #------------------------------------------------------------
+    @property
+    def name_and_path_from_env(self):
+        """Script name and path how given from environment."""
+
+        scriptname = ''
+        if 'SCRIPT_NAME' in os.environ and os.environ['SCRIPT_NAME']:
+            scriptname = os.environ['SCRIPT_NAME']
+
+        pathinfo = ''
+        if 'PATH_INFO' in os.environ and os.environ['PATH_INFO']:
+            pathinfo = os.environ['PATH_INFO']
+
+        uri = None
+        if self.request_uri is not None:
+            uri = unquote(re.sub(r'\?.*', '', self.request_uri))
+
+        if uri is not None and uri != (scriptname + pathinfo):
+            re_escaped_slash = re.compile(r'(?:\\/)+')
+            script_name_pattern = re.escape(scriptname)
+            script_name_pattern = re_escaped_slash.sub('/+', script_name_pattern)
+            path_info_pattern = re.escape(pathinfo)
+            path_info_pattern = re_escaped_slash.sub('/+', path_info_pattern)
+
+            script_pattern = (r'^(' + script_name_pattern + ')(' +
+                    path_info_pattern + ')$')
+            match = re.search(script_pattern, uri, re.DOTALL)
+            if match:
+                scriptname = match.group(1)
+                pathinfo = match.group(2)
+
+        return (scriptname, pathinfo)
+
+    #------------------------------------------------------------
+    @property
+    def path_info(self):
+        """
+        The extra virtual path information provided after the URL (if any).
+        """
+        if self._path_info is None:
+            (scriptname, pathinfo) = self.name_and_path_from_env
+            self._path_info = pathinfo
+        return self._path_info
+
+    @path_info.setter
+    def path_info(self, value):
+        if value is None:
+            value = ''
+        else:
+            value = str(value)
+        if value != '' and not value.startswith('/'):
+            value = "/" + value
+        self._path_info = value
+
+    #------------------------------------------------------------
+    @property
+    def script_name(self):
+        """
+        The extra virtual path information provided after the URL (if any).
+        """
+        if self._script_name is None:
+            (scriptname, pathinfo) = self.name_and_path_from_env
+            self._script_name = scriptname
+        return self._script_name
+
+    @script_name.setter
+    def script_name(self, value):
+        if value is None:
+            v = ''
+        elif isinstance(value, (list, tuple)):
+            if len(value) > 0:
+                v = str(value.pop(0))
+            else:
+                v = ''
+        else:
+            v = str(value)
+        self._script_name = v
+
     #--------------------------------------------------------------------------
     def as_dict(self, short = False):
         """
@@ -252,6 +330,9 @@ class CgiHandler(PbBaseObject):
         res['crlf'] = "%r" % (self.crlf)
         res['cache'] = self.cache
         res['request_uri'] = self.request_uri
+        res['name_and_path_from_env'] = self.name_and_path_from_env
+        res['path_info'] = self.path_info
+        res['script_name'] = self.script_name
 
         return res
 
