@@ -51,8 +51,7 @@ class CgiHandler(PbBaseObject):
     # class variables
     crlf = '\015\012'
 
-    re_islatin = re.compile(r'^(ISO-8859-1|WINDOWS-1252)$',
-            re.IGNORECASE)
+    re_islatin = re.compile(r'^(ISO-8859-1|WINDOWS-1252)$', re.IGNORECASE)
 
     #--------------------------------------------------------------------------
     def __init__(self,
@@ -65,6 +64,7 @@ class CgiHandler(PbBaseObject):
             simulate = False,
             headers_once = False,
             charset = 'utf-8',
+            cache = False,
             ):
         """
         Initialisation of the CGI handler object.
@@ -92,6 +92,9 @@ class CgiHandler(PbBaseObject):
         @type headers_once: bool
         @param charset: the used character set
         @type charset: str
+        @param cache: flag whether header() will produce the
+                      no-cache Pragma directive.
+        @type cache: bool
 
         @return: None
         """
@@ -115,6 +118,8 @@ class CgiHandler(PbBaseObject):
         self._is_cgi = False
         if 'GATEWAY_INTERFACE' in os.environ:
             self._is_cgi = True
+
+        self._cache = bool(cache)
 
         super(CgiHandler, self).__init__(
                 appname = appname,
@@ -204,6 +209,18 @@ class CgiHandler(PbBaseObject):
             return True
         return False
 
+    #------------------------------------------------------------
+    @property
+    def cache(self):
+        """
+        Control whether header() will produce the no-cache Pragma directive.
+        """
+        return self._cache
+
+    @cache.setter
+    def cache(self, value):
+        self._cache = bool(value)
+
     #--------------------------------------------------------------------------
     def as_dict(self, short = False):
         """
@@ -225,6 +242,7 @@ class CgiHandler(PbBaseObject):
         res['charset'] = self.charset
         res['islatin_charset'] = self.islatin_charset
         res['crlf'] = "%r" % (self.crlf)
+        res['cache'] = self.cache
 
         return res
 
@@ -244,6 +262,7 @@ class CgiHandler(PbBaseObject):
         fields.append("simulate=%r" % (self.simulate))
         fields.append("headers_once=%r" % (self.headers_once))
         fields.append("charset=%r" % (self.charset))
+        fields.append("cache=%r" % (self.cache))
 
         out += ", ".join(fields) + ")>"
         return out
