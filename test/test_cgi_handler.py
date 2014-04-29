@@ -65,11 +65,48 @@ class TestCgiHandler(DynDnsTestcase):
         from py_ddns.cgi_handler import CgiHandler
 
         hdlr = CgiHandler(
-            appname = self.appname,
-            verbose = self.verbose,
+                appname = self.appname,
+                verbose = self.verbose,
         )
         log.debug("CgiHandler %%r: %r", hdlr)
         log.debug("CgiHandler %%s: %s", str(hdlr))
+
+    #--------------------------------------------------------------------------
+    def test_is_cgi(self):
+
+        log.info("Testing property 'is_cgi'.")
+
+        from py_ddns.cgi_handler import CgiHandler
+
+        old_env_gwif = None
+        if 'GATEWAY_INTERFACE' in os.environ:
+            old_env_gwif = os.environ['GATEWAY_INTERFACE']
+
+        try:
+            os.environ['GATEWAY_INTERFACE'] = 'CGI 1.0'
+
+            hdlr = CgiHandler(
+                    appname = self.appname,
+                    verbose = self.verbose,
+            )
+            self.assertTrue(hdlr.is_cgi)
+            del hdlr
+
+            del os.environ['GATEWAY_INTERFACE']
+
+            hdlr = CgiHandler(
+                    appname = self.appname,
+                    verbose = self.verbose,
+            )
+            self.assertFalse(hdlr.is_cgi)
+            del hdlr
+
+        finally:
+            if old_env_gwif is None:
+                if 'GATEWAY_INTERFACE' in os.environ:
+                    del os.environ['GATEWAY_INTERFACE']
+            else:
+                os.environ['GATEWAY_INTERFACE'] = old_env_gwif
 
 
 #==============================================================================
@@ -89,6 +126,7 @@ if __name__ == '__main__':
 
     suite.addTest(TestCgiHandler('test_import', verbose))
     suite.addTest(TestCgiHandler('test_cgi_handler_object', verbose))
+    suite.addTest(TestCgiHandler('test_is_cgi', verbose))
 
     runner = unittest.TextTestRunner(verbosity = verbose)
 

@@ -97,6 +97,10 @@ class CgiHandler(PbBaseObject):
         self._headers_once = bool(headers_once)
         self._header_printed = 0
 
+        self._is_cgi = False
+        if 'GATEWAY_INTERFACE' in os.environ:
+            self._is_cgi = True
+
         super(CgiHandler, self).__init__(
                 appname = appname,
                 verbose = verbose,
@@ -153,6 +157,12 @@ class CgiHandler(PbBaseObject):
     def errors_to_stdout(self, value):
         self._errors_to_stdout = bool(value)
 
+    #------------------------------------------------------------
+    @property
+    def is_cgi(self):
+        """Flag, that the current application is a real CGI application."""
+        return self._is_cgi
+
     #--------------------------------------------------------------------------
     def as_dict(self, short = False):
         """
@@ -170,6 +180,7 @@ class CgiHandler(PbBaseObject):
         res['errors_to_stdout'] = self.errors_to_stdout
         res['headers_once'] = self.headers_once
         res['header_printed'] = self.header_printed
+        res['is_cgi'] = self.is_cgi
 
         return res
 
