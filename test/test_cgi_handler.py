@@ -108,6 +108,45 @@ class TestCgiHandler(DynDnsTestcase):
             else:
                 os.environ['GATEWAY_INTERFACE'] = old_env_gwif
 
+    #--------------------------------------------------------------------------
+    def test_charset(self):
+
+        log.info("Testing properties 'charset' and 'islatin_charset'.")
+
+        from py_ddns.cgi_handler import CgiHandler
+
+        hdlr = CgiHandler(
+                appname = self.appname,
+                verbose = self.verbose,
+        )
+
+        cset_list = (
+            None,
+            'utf-8',
+            ' utf-8 ',
+            'ISO-8859-1',
+            'iso-8859-1 ',
+            'ISO-8859-15',
+            'WINDOWS-1252',
+        )
+
+        csets = {
+            None: (None, True),
+            'utf-8': ('utf-8', False),
+            ' utf-8 ': ('utf-8', False),
+            'ISO-8859-1': ('ISO-8859-1', True),
+            'iso-8859-1 ': ('iso-8859-1', True),
+            'ISO-8859-15': ('ISO-8859-15', False),
+            'WINDOWS-1252': ('WINDOWS-1252', True),
+        }
+
+        for cset in cset_list:
+            log.debug("Testing character set %r ...", cset)
+            exp_cset = csets[cset][0]
+            is_latin = csets[cset][1]
+            hdlr.charset = cset
+            self.assertEqual(hdlr.charset, exp_cset)
+            self.assertEqual(hdlr.islatin_charset, is_latin)
 
 #==============================================================================
 
@@ -127,6 +166,7 @@ if __name__ == '__main__':
     suite.addTest(TestCgiHandler('test_import', verbose))
     suite.addTest(TestCgiHandler('test_cgi_handler_object', verbose))
     suite.addTest(TestCgiHandler('test_is_cgi', verbose))
+    suite.addTest(TestCgiHandler('test_charset', verbose))
 
     runner = unittest.TextTestRunner(verbosity = verbose)
 

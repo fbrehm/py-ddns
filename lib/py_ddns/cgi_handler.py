@@ -48,6 +48,12 @@ class CgiHandler(PbBaseObject):
     Class for CGI dependend operations.
     """
 
+    # class variables
+    crlf = '\015\012'
+
+    re_islatin = re.compile(r'^(ISO-8859-1|WINDOWS-1252)$',
+            re.IGNORECASE)
+
     #--------------------------------------------------------------------------
     def __init__(self,
             appname = None,
@@ -57,7 +63,8 @@ class CgiHandler(PbBaseObject):
             errors_to_stdout = False,
             initialized = False,
             simulate = False,
-            headers_once = False
+            headers_once = False,
+            charset = 'utf-8',
             ):
         """
         Initialisation of the CGI handler object.
@@ -83,6 +90,8 @@ class CgiHandler(PbBaseObject):
         @type simulate: bool
         @param headers_once: suppress redundant HTTP headers
         @type headers_once: bool
+        @param charset: the used character set
+        @type charset: str
 
         @return: None
         """
@@ -92,6 +101,12 @@ class CgiHandler(PbBaseObject):
         @ivar: a flag indicating, that error messages should pushed to
                STDOUT wrapped as a HTML document instead to STDERR.
         @type: bool
+        """
+
+        self._charset = str(charset).strip()
+        """
+        @ivar: the used character set
+        @type: str
         """
 
         self._headers_once = bool(headers_once)
@@ -115,6 +130,9 @@ class CgiHandler(PbBaseObject):
         @ivar: don't execute actions, only display them
         @type: bool
         """
+
+        self._path_info = None
+        self._script_name = None
 
         self.initialized = initialized
         if self.verbose > 3:
@@ -163,6 +181,29 @@ class CgiHandler(PbBaseObject):
         """Flag, that the current application is a real CGI application."""
         return self._is_cgi
 
+    #------------------------------------------------------------
+    @property
+    def charset(self):
+        """The used character set."""
+        return self._charset
+
+    @charset.setter
+    def charset(self, value):
+        if value is None:
+            self._charset = None
+        else:
+            self._charset = str(value).strip()
+
+    #------------------------------------------------------------
+    @property
+    def islatin_charset(self):
+        """Is the current character set a latin charset?"""
+        if self.charset is None:
+            return True
+        if self.re_islatin.search(self.charset):
+            return True
+        return False
+
     #--------------------------------------------------------------------------
     def as_dict(self, short = False):
         """
@@ -181,6 +222,9 @@ class CgiHandler(PbBaseObject):
         res['headers_once'] = self.headers_once
         res['header_printed'] = self.header_printed
         res['is_cgi'] = self.is_cgi
+        res['charset'] = self.charset
+        res['islatin_charset'] = self.islatin_charset
+        res['crlf'] = "%r" % (self.crlf)
 
         return res
 
@@ -199,6 +243,7 @@ class CgiHandler(PbBaseObject):
         fields.append("errors_to_stdout=%r" % (self.errors_to_stdout))
         fields.append("simulate=%r" % (self.simulate))
         fields.append("headers_once=%r" % (self.headers_once))
+        fields.append("charset=%r" % (self.charset))
 
         out += ", ".join(fields) + ")>"
         return out
