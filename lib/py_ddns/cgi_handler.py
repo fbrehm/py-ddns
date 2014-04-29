@@ -221,6 +221,14 @@ class CgiHandler(PbBaseObject):
     def cache(self, value):
         self._cache = bool(value)
 
+    #------------------------------------------------------------
+    @property
+    def request_uri(self):
+        """The literal request URI."""
+        if 'REQUEST_URI' in os.environ and os.environ['REQUEST_URI']:
+            return os.environ['REQUEST_URI']
+        return None
+
     #--------------------------------------------------------------------------
     def as_dict(self, short = False):
         """
@@ -243,6 +251,7 @@ class CgiHandler(PbBaseObject):
         res['islatin_charset'] = self.islatin_charset
         res['crlf'] = "%r" % (self.crlf)
         res['cache'] = self.cache
+        res['request_uri'] = self.request_uri
 
         return res
 
