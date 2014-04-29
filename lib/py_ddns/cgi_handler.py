@@ -34,7 +34,7 @@ from pb_base.object import PbBaseObject
 
 log = logging.getLogger(__name__)
 
-__version__ = '0.1.0'
+__version__ = '0.1.1'
 
 #==============================================================================
 class CgiError(PbBaseObjectError):
@@ -57,6 +57,7 @@ class CgiHandler(PbBaseObject):
             errors_to_stdout = False,
             initialized = False,
             simulate = False,
+            headers_once = False
             ):
         """
         Initialisation of the CGI handler object.
@@ -80,6 +81,8 @@ class CgiHandler(PbBaseObject):
         @type initialized: bool
         @param simulate: don't execute actions, only display them
         @type simulate: bool
+        @param headers_once: suppress redundant HTTP headers
+        @type headers_once: bool
 
         @return: None
         """
@@ -90,6 +93,9 @@ class CgiHandler(PbBaseObject):
                STDOUT wrapped as a HTML document instead to STDERR.
         @type: bool
         """
+
+        self._headers_once = bool(headers_once)
+        self._header_printed = 0
 
         super(CgiHandler, self).__init__(
                 appname = appname,
@@ -122,6 +128,22 @@ class CgiHandler(PbBaseObject):
 
     #------------------------------------------------------------
     @property
+    def headers_once(self):
+        """Suppress redundant HTTP headers."""
+        return self._headers_once
+
+    @headers_once.setter
+    def headers_once(self, value):
+        self._headers_once = bool(value)
+
+    #------------------------------------------------------------
+    @property
+    def header_printed(self):
+        """How often was the HTTP header printed."""
+        return self._header_printed
+
+    #------------------------------------------------------------
+    @property
     def errors_to_stdout(self):
         """A flag indicating, that error messages should pushed to
             STDOUT wrapped as a HTML document instead to STDERR."""
@@ -146,6 +168,8 @@ class CgiHandler(PbBaseObject):
         res = super(CgiHandler, self).as_dict(short = short)
         res['simulate'] = self.simulate
         res['errors_to_stdout'] = self.errors_to_stdout
+        res['headers_once'] = self.headers_once
+        res['header_printed'] = self.header_printed
 
         return res
 
@@ -162,6 +186,8 @@ class CgiHandler(PbBaseObject):
         fields.append("base_dir=%r" % (self.base_dir))
         fields.append("initialized=%r" % (self.initialized))
         fields.append("errors_to_stdout=%r" % (self.errors_to_stdout))
+        fields.append("simulate=%r" % (self.simulate))
+        fields.append("headers_once=%r" % (self.headers_once))
 
         out += ", ".join(fields) + ")>"
         return out
