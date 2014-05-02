@@ -16,6 +16,8 @@ import logging
 import tempfile
 import time
 import locale
+import re
+import datetime
 
 libdir = os.path.abspath(os.path.join(os.path.dirname(sys.argv[0]), '..', 'lib'))
 sys.path.insert(0, libdir)
@@ -286,6 +288,65 @@ class TestCgiHandler(DynDnsTestcase):
 
         del hdlr
         
+    #--------------------------------------------------------------------------
+    @restore_env
+    def test_format_expire_date(self):
+
+        log.info("Testing formatting an expire date.")
+
+        test_dates = (
+            None,
+            'now',
+            0,
+            1000,
+            "+180s",
+            "+2m",
+            "+12h",
+            "+1d",
+            "+2d",
+            "+3d",
+            "+4d",
+            "+5d",
+            "+6d",
+            "+2w",
+            "+3M",
+            "+2y",
+            "-3m",
+            datetime.date.today(),
+            datetime.datetime.utcnow(),
+            datetime.time(23, 20, 30),
+            datetime.time(0, 20, 30),
+            datetime.timedelta(days = 2, hours = 3),
+            datetime.timedelta(minutes = -2),
+        )
+
+        from py_ddns.cgi_handler import CgiHandler
+
+        os.environ['GATEWAY_INTERFACE'] = 'CGI/1.0'
+
+        hdlr = CgiHandler(
+                appname = self.appname,
+                verbose = self.verbose,
+        )
+
+        wdays = ('Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun')
+        wd_pattern = '|'.join(wdays)
+
+        re_edate_http = re.compile(r'^(?:' + wd_pattern + r'), \d+ \S+ \d+ \d\d:\d\d:\d\d GMT')
+        re_edate_cookie = re.compile(r'^(?:' + wd_pattern + r'), \d+-\S+-\d+ \d\d:\d\d:\d\d GMT')
+
+        for d in test_dates:
+            log.debug("Testing an expire date of %r ...", d)
+            edate_http = hdlr.format_expire_date(d)
+            edate_cookie = hdlr.format_expire_date(d, True)
+            log.debug("Got expire date HTTP %r, cookie %r.", edate_http, edate_cookie)
+            if sys.version_info[0] > 2:
+                self.assertRegex(edate_http, re_edate_http, "not a HTTP expire date")
+                self.assertRegex(edate_cookie, re_edate_cookie, "not a cookie expire date")
+            else:
+                self.assertRegexpMatches(edate_http, re_edate_http, "not a HTTP expire date")
+                self.assertRegexpMatches(edate_cookie, re_edate_cookie, "not a cookie expire date")
+
 
 #==============================================================================
 
@@ -308,6 +369,7 @@ if __name__ == '__main__':
     suite.addTest(TestCgiHandler('test_charset', verbose))
     suite.addTest(TestCgiHandler('test_escape_html', verbose))
     suite.addTest(TestCgiHandler('test_unescape_html', verbose))
+    suite.addTest(TestCgiHandler('test_format_expire_date', verbose))
 
     runner = unittest.TextTestRunner(verbosity = verbose)
 

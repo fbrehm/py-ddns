@@ -43,6 +43,59 @@ class CgiError(PbBaseObjectError):
     pass
 
 #==============================================================================
+# A UTC class.
+
+ZERO = datetime.timedelta(0)
+
+class UTC(datetime.tzinfo):
+    """UTC
+
+    Optimized UTC implementation. It unpickles using the single module global
+    instance defined beneath this class declaration.
+    """
+    zone = "UTC"
+
+    _utcoffset = ZERO
+    _dst = ZERO
+    _tzname = zone
+
+    def fromutc(self, dt):
+        if dt.tzinfo is None:
+            return self.localize(dt)
+        return super(utc.__class__, self).fromutc(dt)
+
+    def utcoffset(self, dt):
+        return ZERO
+
+    def tzname(self, dt):
+        return "UTC"
+
+    def dst(self, dt):
+        return ZERO
+
+    def localize(self, dt, is_dst=False):
+        '''Convert naive time to local time'''
+        if dt.tzinfo is not None:
+            raise ValueError('Not naive datetime (tzinfo is already set)')
+        return dt.replace(tzinfo=self)
+
+    def normalize(self, dt, is_dst=False):
+        '''Correct the timezone information on the given datetime'''
+        if dt.tzinfo is self:
+            return dt
+        if dt.tzinfo is None:
+            raise ValueError('Naive time - no tzinfo set')
+        return dt.astimezone(self)
+
+    def __repr__(self):
+        return "<UTC>"
+
+    def __str__(self):
+        return "UTC"
+
+utc = UTC()
+
+#==============================================================================
 class CgiHandler(PbBaseObject):
     """
     Class for CGI dependend operations.
@@ -78,6 +131,12 @@ class CgiHandler(PbBaseObject):
 
     re_header = re.compile(r'([^ \r\n\t=]+)=\"?(.+?)\"?$')
     re_charset = re.compile(r'\bcharset\b')
+
+    re_int = re.compile(r'^\s*(\d+)')
+    re_expire_diff = re.compile(r'([+-]?(?:\d+|\d*\.\d*))([smhdwMy])')
+
+    re_unfold = re.compile(crlf + r'(\s)')
+    re_has_linebreaks = re.compile(crlf + '|\015|\012')
 
     #--------------------------------------------------------------------------
     def __init__(self,
@@ -476,6 +535,130 @@ class CgiHandler(PbBaseObject):
         unescaped = self.re_escaped_html.sub(unescaped_char, to_unescape)
 
         return unescaped
+
+    #--------------------------------------------------------------------------
+    def format_expire_date(self, etime = None, format_cookie = False):
+        """
+        Creates date strings suitable for use in cookies and HTTP headers.
+        (They differ, unfortunately.)
+
+        @param etime: the time to format
+                      possible given values are::
+                        * None or 0 or 'now'    -- expire immediately
+                        * an integer value > 0  -- an UNIX timestamp, when to expire
+                        * "+180s"               -- in 180 seconds
+                        * "+2m"                 -- in 2 minutes
+                        * "+12h"                -- in 12 hours
+                        * "+1d"                 -- in one day
+                        * "+2w"                 -- in 2 weeks
+                        * "+3M"                 -- in 3 months
+                        * "+2y"                 -- in 2 years
+                        * "-3m"                 -- 3 minutes ago(!)
+        @type: None or int or str
+
+        @return: the formatted Expire time
+        @rtype: str
+
+        """
+
+        etime = self._calc_expire_date(etime)
+        if not isinstance(etime, int):
+            return str(etime)
+
+        sc = ' '
+        if format_cookie:
+            sc = '-'
+
+        (lang_code, encoding) = locale.getlocale(locale.LC_TIME)
+        if lang_code:
+            locale.setlocale(locale.LC_TIME, 'C')
+
+        fmt = "%a, %d" + sc + "%b" + sc + "%Y %H:%M:%S GMT"
+        try:
+            dt = datetime.datetime.utcfromtimestamp(etime)
+            dt_formatted = dt.strftime(fmt)
+        finally:
+            if lang_code:
+                locale.setlocale(locale.LC_TIME, (lang_code, encoding))
+
+        return dt_formatted
+
+    #--------------------------------------------------------------------------
+    def _calc_expire_date(self, etime = None):
+        """
+        Creates an expires time exactly some number of hours from the current time.
+        """
+
+        offset = 0
+        mult = {
+                's': 1,
+                'm': 60,
+                'h': 60 * 60,
+                'd': 60 * 60 * 24,
+                'w': 60 * 60 * 24 * 7,
+                'M': 60 * 60 * 24 * 30,
+                'y': 60 * 60 * 24 * 365,
+        }
+
+        if self.verbose > 3:
+            log.debug("Calculating expire date from %r", etime)
+
+        if isinstance(etime, int) and etime != 0:
+            if self.verbose > 3:
+                log.debug("Returning %r", etime)
+            return etime
+
+        if isinstance(etime, float):
+            if self.verbose > 3:
+                log.debug("Returning %r", int(etime))
+            return int(etime)
+
+        if etime is None:
+            offset = 0
+        elif isinstance(etime, str):
+            match = self.re_int.search(etime)
+            if match:
+                res = int(match.group(1))
+                if self.verbose > 3:
+                    log.debug("Returning %r", res)
+                return res
+            if etime.lower() == 'now':
+                offset = 0
+            else:
+                match = self.re_expire_diff.search(etime)
+                if match:
+                    factor = 1.0
+                    base = float(match.group(1))
+                    unit = match.group(2)
+                    if unit in mult:
+                        factor = float(mult[unit])
+                    offset = int(base * factor)
+                else:
+                    if self.verbose > 3:
+                        log.debug("Returning %r", etime)
+                    return etime
+        elif isinstance(etime, datetime.timedelta):
+            dt = datetime.datetime.now() + etime
+            return int(dt.strftime('%s'))
+        elif isinstance(etime, datetime.datetime):
+            return int(etime.strftime('%s'))
+        elif isinstance(etime, datetime.date):
+            dt = datetime.datetime(etime.year, etime.month, etime.day, tzinfo = utc)
+            return int(dt.strftime('%s'))
+        elif isinstance(etime, datetime.time):
+            _today = datetime.date.today()
+            dt = datetime.datetime(_today.year, _today.month, _today.day,
+                    etime.hour, etime.minute, etime.second, etime.microsecond,
+                    etime.tzinfo)
+            if dt < datetime.datetime.now():
+                dt += datetime.timedelta(1)
+            return int(dt.strftime('%s'))
+        elif not isinstance(etime, int):
+            return etime
+
+        if self.verbose > 3:
+            log.debug("Offset is %d.", offset)
+        return int(time.time()) + offset
 
 
 #==============================================================================
