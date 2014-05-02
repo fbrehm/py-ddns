@@ -51,7 +51,33 @@ class CgiHandler(PbBaseObject):
     # class variables
     crlf = '\015\012'
 
+    nph = False
+    """
+    @cvar: usage of a non-parsing header
+    @type: bool
+    """
+
     re_islatin = re.compile(r'^(ISO-8859-1|WINDOWS-1252)$', re.IGNORECASE)
+
+    dtd_public_identifier = ''
+
+    re_amp_sign = re.compile(r'&', re.DOTALL)
+    re_lt_sign = re.compile(r'<', re.DOTALL)
+    re_gt_sign = re.compile(r'>', re.DOTALL)
+    re_dquot_sign = re.compile(r'"', re.DOTALL)
+    re_squot_sign = re.compile(r"'", re.DOTALL)
+    re_hex_8b = re.compile("\x8b", re.DOTALL)
+    re_hex_9b = re.compile("\x9b", re.DOTALL)
+    re_oct_12 = re.compile('\012', re.DOTALL)
+    re_oct_15 = re.compile('\015', re.DOTALL)
+    re_html_3_2 = re.compile(r'[^X]HTML 3\.2', re.IGNORECASE)
+
+    re_escaped_html = re.compile(r"&([^\s&]*?);")
+    re_dec_entity = re.compile(r"#(\d+)$")
+    re_hex_entity = re.compile(r"#x([0-9a-f]+)$", re.IGNORECASE)
+
+    re_header = re.compile(r'([^ \r\n\t=]+)=\"?(.+?)\"?$')
+    re_charset = re.compile(r'\bcharset\b')
 
     #--------------------------------------------------------------------------
     def __init__(self,
@@ -333,6 +359,7 @@ class CgiHandler(PbBaseObject):
         res['name_and_path_from_env'] = self.name_and_path_from_env
         res['path_info'] = self.path_info
         res['script_name'] = self.script_name
+        res['nph'] = self.nph
 
         return res
 
@@ -357,6 +384,98 @@ class CgiHandler(PbBaseObject):
         out += ", ".join(fields) + ")>"
         return out
 
+    #--------------------------------------------------------------------------
+    def escape_html(self, toencode, newlinestoo = False):
+        """
+        Escape HTML, e.g. '>' -> '&gt;'
+
+        @param toencode: the string, where to escape entities
+        @type toencode: str
+        @param newlinestoo: escape also new line and carriage return characters
+        @type newlinestoo: bool
+
+        @return: the string with escaped entities
+        @rtype: str
+
+        """
+
+        if toencode is None:
+            return None
+
+        toencode = self.re_amp_sign.sub('&amp;', toencode)
+        toencode = self.re_lt_sign.sub('&lt;', toencode)
+        toencode = self.re_gt_sign.sub('&gt;', toencode)
+
+        if self.re_html_3_2.search(self.dtd_public_identifier):
+            toencode = self.re_dquot_sign.sub('&#34;', toencode)
+        else:
+            toencode = self.re_dquot_sign.sub('&quot;', toencode)
+
+        if self.charset and self.islatin_charset:
+            toencode = self.re_squot_sign.sub('&#39;', toencode)
+            toencode = self.re_hex_8b.sub('&#8249;', toencode)
+            toencode = self.re_hex_9b.sub('&#8250;', toencode)
+            if newlinestoo:
+                toencode = self.re_oct_12.sub('&#10;', toencode)
+                toencode = self.re_oct_15.sub('&#13;', toencode)
+
+        return toencode
+
+    #--------------------------------------------------------------------------
+    def unescape_html(self, to_unescape):
+        """
+        Unescape HTML, e.g. '&lt;' -> '<'
+
+        @param to_unescape: the character string, where to unescape entities
+        @type to_unescape: str
+
+        @return: the character string with unescaped entities
+        @rtype: str
+
+        """
+
+        if to_unescape is None:
+            return None
+
+        latin = True
+        if self.charset is not None:
+            if not self.islatin_charset:
+                latin = False
+
+        #-----------------
+        def unescaped_char(matchobj):
+
+            c = matchobj.group(1)
+
+            if c == 'amp':
+                return '&'
+
+            if c == 'quot':
+                return '"'
+
+            if c == 'gt':
+                return '>'
+
+            if c == 'lt':
+                return '<'
+
+            if latin:
+
+                ent_match = self.re_dec_entity.search(c)
+                if ent_match:
+                    number = int(ent_match.group(1))
+                    return chr(number)
+
+                ent_match = self.re_hex_entity.search(c)
+                if ent_match:
+                    number = int(ent_match.group(1), 16)
+                    return chr(number)
+
+            return '&%s;' % (c)
+
+        unescaped = self.re_escaped_html.sub(unescaped_char, to_unescape)
+
+        return unescaped
 
 
 #==============================================================================

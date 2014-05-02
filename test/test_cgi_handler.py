@@ -31,6 +31,64 @@ locale.setlocale(locale.LC_ALL, '')
 log = logging.getLogger(__name__)
 
 #==============================================================================
+def restore_env(func):
+    """
+    Decorator function to restore all important environment variables
+    """
+
+    env_keys = (
+        'DOCUMENT_ROOT',
+        'GATEWAY_INTERFACE',
+        'HTTP_ACCEPT',
+        'HTTP_ACCEPT_ENCODING',
+        'HTTP_ACCEPT_LANGUAGE',
+        'HTTP_CONNECTION',
+        'HTTP_HOST',
+        'HTTP_USER_AGENT',
+        'PATH',
+        'QUERY_STRING',
+        'REMOTE_ADDR',
+        'REMOTE_PORT',
+        'REQUEST_METHOD',
+        'REQUEST_URI',
+        'SCRIPT_FILENAME',
+        'SCRIPT_NAME',
+        'SERVER_ADDR',
+        'SERVER_ADMIN',
+        'SERVER_NAME',
+        'SERVER_PORT',
+        'SERVER_PROTOCOL',
+        'SERVER_SIGNATURE',
+        'SERVER_SOFTWARE',
+        'UNIQUE_ID',
+    )
+
+    def caller(self, *args, **kwargs):
+
+        old_env = {}
+        for key in env_keys:
+            old_env[key] = None
+            if key in os.environ:
+                old_env[key] = os.environ[key]
+        #log.debug("Saved environment: %s", pp(old_env))
+
+        try:
+            return func(self, *args, **kwargs)
+        finally:
+            for key in env_keys:
+                if key in old_env:
+                    if old_env[key] is None:
+                        if key in os.environ:
+                            del os.environ[key]
+                    else:
+                        os.environ[key] = old_env[key]
+                else:
+                    if key in os.environ:
+                        del os.environ[key]
+
+    return caller
+
+#==============================================================================
 
 class TestCgiHandler(DynDnsTestcase):
 
@@ -72,41 +130,30 @@ class TestCgiHandler(DynDnsTestcase):
         log.debug("CgiHandler %%s: %s", str(hdlr))
 
     #--------------------------------------------------------------------------
+    @restore_env
     def test_is_cgi(self):
 
         log.info("Testing property 'is_cgi'.")
 
         from py_ddns.cgi_handler import CgiHandler
 
-        old_env_gwif = None
-        if 'GATEWAY_INTERFACE' in os.environ:
-            old_env_gwif = os.environ['GATEWAY_INTERFACE']
+        os.environ['GATEWAY_INTERFACE'] = 'CGI/1.0'
 
-        try:
-            os.environ['GATEWAY_INTERFACE'] = 'CGI 1.0'
+        hdlr = CgiHandler(
+                appname = self.appname,
+                verbose = self.verbose,
+        )
+        self.assertTrue(hdlr.is_cgi)
+        del hdlr
 
-            hdlr = CgiHandler(
-                    appname = self.appname,
-                    verbose = self.verbose,
-            )
-            self.assertTrue(hdlr.is_cgi)
-            del hdlr
+        del os.environ['GATEWAY_INTERFACE']
 
-            del os.environ['GATEWAY_INTERFACE']
-
-            hdlr = CgiHandler(
-                    appname = self.appname,
-                    verbose = self.verbose,
-            )
-            self.assertFalse(hdlr.is_cgi)
-            del hdlr
-
-        finally:
-            if old_env_gwif is None:
-                if 'GATEWAY_INTERFACE' in os.environ:
-                    del os.environ['GATEWAY_INTERFACE']
-            else:
-                os.environ['GATEWAY_INTERFACE'] = old_env_gwif
+        hdlr = CgiHandler(
+                appname = self.appname,
+                verbose = self.verbose,
+        )
+        self.assertFalse(hdlr.is_cgi)
+        del hdlr
 
     #--------------------------------------------------------------------------
     def test_charset(self):
@@ -148,6 +195,98 @@ class TestCgiHandler(DynDnsTestcase):
             self.assertEqual(hdlr.charset, exp_cset)
             self.assertEqual(hdlr.islatin_charset, is_latin)
 
+    #--------------------------------------------------------------------------
+    @restore_env
+    def test_escape_html(self):
+
+        log.info("Testing escaping HTML entities.")
+
+        from py_ddns.cgi_handler import CgiHandler
+
+        test_strings = (
+            ('<html>Me & you.</html>', '&lt;html&gt;Me &amp; you.&lt;/html&gt;'),
+            ('\'bla\' "Sülz"', '\'bla\' &quot;Sülz&quot;'),
+        )
+
+        test_string_nl = (
+            "first row.\n'Second' row.\r\nthird row.\r\n",
+            'first row.&#10;&#39;Second&#39; row.&#13;&#10;third row.&#13;&#10;',
+        )
+
+        os.environ['GATEWAY_INTERFACE'] = 'CGI/1.0'
+
+        hdlr = CgiHandler(
+                appname = self.appname,
+                verbose = self.verbose,
+                charset = 'utf-8',
+        )
+
+        for test_str in test_strings:
+            log.debug("Escaping entities in %r ...", test_str[0])
+            escaped = hdlr.escape_html(test_str[0])
+            exp = test_str[1]
+            log.debug("Expected string %r: %r.", exp.__class__.__name__, exp)
+            log.debug("Escaped string %r: %r.", escaped.__class__.__name__, escaped)
+            self.assertEqual(exp, escaped,
+                    ("Escaped string %r is not equal to %r." % (escaped, exp)))
+
+        log.debug("Escaping entities in %r (UTF-8)...", test_string_nl[0])
+        escaped = hdlr.escape_html(test_string_nl[0])
+        exp = test_string_nl[0]
+        log.debug("Expected string %r: %r.", exp.__class__.__name__, exp)
+        log.debug("Escaped string %r: %r.", escaped.__class__.__name__, escaped)
+        self.assertEqual(exp, escaped,
+                ("Escaped string %r is not equal to %r." % (escaped, exp)))
+
+        hdlr.charset = 'windows-1252'
+        log.debug("Escaping entities in %r (WINDOWS-1252)...", test_string_nl[0])
+        escaped = hdlr.escape_html(test_string_nl[0], newlinestoo = True)
+        exp = test_string_nl[1]
+        log.debug("Expected string %r: %r.", exp.__class__.__name__, exp)
+        log.debug("Escaped string %r: %r.", escaped.__class__.__name__, escaped)
+        self.assertEqual(exp, escaped,
+                ("Escaped string %r is not equal to %r." % (escaped, exp)))
+
+        del hdlr
+
+    #--------------------------------------------------------------------------
+    @restore_env
+    def test_unescape_html(self):
+
+        log.info("Testing unescaping HTML entities.")
+
+        test_strings = (
+            ('&lt;html&gt;Me &amp; you.&lt;/html&gt;', '<html>Me & you.</html>'),
+            ('\'bla\' &quot;Sülz&quot;', '\'bla\' "Sülz"'),
+            ("first row.\n'Second' row.\r\nthird row.\r\n",
+                "first row.\n'Second' row.\r\nthird row.\r\n"),
+            ('first row.&#10;&#39;Second&#39; row.&#13;&#10;third row.&#13;&#10;',
+                "first row.\n'Second' row.\r\nthird row.\r\n"),
+        )
+
+        from py_ddns.cgi_handler import CgiHandler
+
+        os.environ['GATEWAY_INTERFACE'] = 'CGI/1.0'
+
+        hdlr = CgiHandler(
+                appname = self.appname,
+                verbose = self.verbose,
+                charset = 'windows-1252',
+        )
+
+        for test_str in test_strings:
+            escaped = test_str[0]
+            expected = test_str[1]
+            log.debug("Unescaping entities in %r ...", escaped)
+            log.debug("Expected string %r: %r.", expected.__class__.__name__, expected)
+            unescaped = hdlr.unescape_html(escaped)
+            log.debug("Unescaped string %r: %r.", unescaped.__class__.__name__, unescaped)
+            self.assertEqual(expected, unescaped,
+                    ("Unescaped string %r is not equal to %r." % (unescaped, expected)))
+
+        del hdlr
+        
+
 #==============================================================================
 
 
@@ -167,6 +306,8 @@ if __name__ == '__main__':
     suite.addTest(TestCgiHandler('test_cgi_handler_object', verbose))
     suite.addTest(TestCgiHandler('test_is_cgi', verbose))
     suite.addTest(TestCgiHandler('test_charset', verbose))
+    suite.addTest(TestCgiHandler('test_escape_html', verbose))
+    suite.addTest(TestCgiHandler('test_unescape_html', verbose))
 
     runner = unittest.TextTestRunner(verbosity = verbose)
 
