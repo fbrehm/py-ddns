@@ -347,6 +347,71 @@ class TestCgiHandler(DynDnsTestcase):
                 self.assertRegexpMatches(edate_http, re_edate_http, "not a HTTP expire date")
                 self.assertRegexpMatches(edate_cookie, re_edate_cookie, "not a cookie expire date")
 
+    #--------------------------------------------------------------------------
+    @restore_env
+    def test_headers(self):
+
+        log.info("Testing Generating a HTTP header.")
+
+        os.environ['GATEWAY_INTERFACE'] = 'CGI/1.0'
+
+        from py_ddns.cgi_handler import CgiHandler
+
+        q = CgiHandler(
+                appname = self.appname,
+                verbose = self.verbose,
+        )
+
+        h = q.header(ctype = "text/html")
+        log.debug("Generated a basic 'text/html' header: %r", h)
+        re_ctype = re.compile(r'Content-Type: text/html', re.IGNORECASE)
+        if sys.version_info[0] > 2:
+            self.assertRegex(h, re_ctype, "invalid HTTP header")
+        else:
+            self.assertRegexpMatches(h, re_ctype, "invalid HTTP header")
+
+        ct = 'text/html'  + q.crlf + "evil: stuff"
+        log.debug("Testing a bad content type %r ...", ct)
+        with self.assertRaises(ValueError) as cm:
+            h = q.header(ctype = ct)
+        e = cm.exception
+        log.debug("ValueError raised: %s", str(e))
+
+        ct = 'text/html'  + q.crlf + " evil: stuff "
+        log.debug(("Testing a bad content type %r (leading and trailing " +
+                "whitespace on the continuation line)."), ct)
+        h = q.header(ctype = ct)
+        log.debug("Generated header: %r", h)
+        re_ctype = re.compile(r'Content-Type: text/html evil: stuff', re.IGNORECASE)
+        if sys.version_info[0] > 2:
+            self.assertRegex(h, re_ctype, "invalid HTTP header")
+        else:
+            self.assertRegexpMatches(h, re_ctype, "invalid HTTP header")
+
+        ct = 'text/html'
+        cookie = "Uhu Banane"
+        log.debug("Testing a header with one cookie...")
+        h = q.header(ctype = ct, cookie = cookie)
+        log.debug("Generated header: %r", h)
+
+        cookie = ("Uhu", "Banane")
+        log.debug("Testing a header with two cookies...")
+        h = q.header(ctype = ct, cookie = cookie)
+        log.debug("Generated header: %r", h)
+
+        prop = 'uhu=Banane'
+        log.debug("Testing a header with self defined property %r.", prop)
+        h = q.header(ct, others = prop)
+        log.debug("Generated header: %r", h)
+
+        props = ('uhu=Banane', 'bla Suelz')
+        log.debug("Testing a header with two self defined properties %r.", props)
+        h = q.header(ct, others = props)
+        log.debug("Generated header: %r", h)
+
+        log.debug("Testing a header with a keyword property.")
+        h = q.header(ct, uhu = 'Banane')
+        log.debug("Generated header: %r", h)
 
 #==============================================================================
 
@@ -370,6 +435,7 @@ if __name__ == '__main__':
     suite.addTest(TestCgiHandler('test_escape_html', verbose))
     suite.addTest(TestCgiHandler('test_unescape_html', verbose))
     suite.addTest(TestCgiHandler('test_format_expire_date', verbose))
+    suite.addTest(TestCgiHandler('test_headers', verbose))
 
     runner = unittest.TextTestRunner(verbosity = verbose)
 

@@ -444,6 +444,13 @@ class CgiHandler(PbBaseObject):
         return out
 
     #--------------------------------------------------------------------------
+    def server_software(self):
+
+        if 'SERVER_SOFTWARE' in os.environ and os.environ['SERVER_SOFTWARE']:
+            return os.environ['SERVER_SOFTWARE']
+        return 'cmdline'
+
+    #--------------------------------------------------------------------------
     def escape_html(self, toencode, newlinestoo = False):
         """
         Escape HTML, e.g. '>' -> '&gt;'
@@ -535,6 +542,139 @@ class CgiHandler(PbBaseObject):
         unescaped = self.re_escaped_html.sub(unescaped_char, to_unescape)
 
         return unescaped
+
+    #--------------------------------------------------------------------------
+    def header(self, ctype = None, status = None, cookie = None,
+            target = None, expires = None, nph = None, charset = None,
+            others = None, **other_kws):
+        """
+        Return a Content-Type: style header
+        """
+
+        if self.header_printed:
+            self.header_printed += 1
+            if self.headers_once:
+                return ''
+
+        headers = []
+
+        # Normalize cookies
+        cookies = []
+        if isinstance(cookie, list) or isinstance(cookie, tuple):
+            for c in cookie:
+                cookies.append(str(c))
+        elif cookie:
+            cookies.append(str(cookie))
+
+        #--------------------------------
+        # Unfolding
+        def unfold(value, what):
+            unfolded = self.re_unfold.sub(r'\1', value)
+            if self.re_has_linebreaks.search(unfolded):
+                msg = ("Invalid header value of %r contains a newline not " +
+                        "followed by whitespace: %r") % (what, unfolded)
+                raise ValueError(msg)
+            return unfolded
+
+        # Check parameters
+        if ctype:
+            ctype = unfold(ctype, "Content-type")
+
+        if status:
+            status = unfold(status, "Status")
+
+        i = 0
+        for c in cookies:
+            cookies[i] = unfold(c, "Cookie")
+            i += 1
+
+        if target:
+            target = unfold(target, "Target")
+
+        if expires:
+            expires = unfold(expires, "Expires")
+
+        if charset:
+            charset = unfold(charset, "Charset")
+
+        other_headers = []
+        if isinstance(others, list) or isinstance(others, tuple):
+            for c in others:
+                hdr = unfold(c, "Other")
+                match = self.re_header.search(hdr)
+                if match:
+                    hdr_name = match.group(1)
+                    value = match.group(2)
+                    hdr = (hdr_name[0:1].upper() + hdr_name[1:].lower() + ': ' +
+                            self.unescape_html(value))
+                other_headers.append(hdr)
+        elif others:
+            hdr = unfold(others, "Other")
+            match = self.re_header.search(hdr)
+            if match:
+                hdr_name = match.group(1)
+                value = match.group(2)
+                hdr = (hdr_name[0:1].upper() + hdr_name[1:].lower() + ': ' +
+                        self.unescape_html(value))
+            other_headers.append(hdr)
+        for key in other_kws:
+            value = other_kws[key]
+            hdr = (key[0:1].upper() + key[1:].lower() + ': ' +
+                    self.unescape_html(value))
+            hdr = unfold(hdr, 'Others')
+            other_headers.append(hdr)
+
+        # Normalize NPH
+        if nph is not None:
+            nph = bool(nph)
+        else:
+            nph = self.nph
+
+        # Default content type, if not given
+        if not ctype:
+            ctype = 'text/html'
+
+        # Set charset, if given
+        if charset:
+            self.charset = charset
+        charset = self.charset
+
+        if ctype and (not self.re_charset.search(ctype)) and charset:
+            ctype += "; charset=%s" % (charset)
+
+        protocol = 'HTTP/1.0'
+        if 'SERVER_PROTOCOL' in os.environ and os.environ['SERVER_PROTOCOL']:
+            protocol = os.environ['SERVER_PROTOCOL']
+
+        if nph:
+            nph_status = '200 OK'
+            if status:
+                nph_status = status
+            headers.append("%s %s" % (protocol, nph_status))
+            headers.append("Server: %s" % (self.server_software()))
+
+        if status:
+            headers.append("Status: %s" % (status))
+        if target:
+            headers.append("Window-Target: %s" % (target))
+
+        if cookies:
+            for c in cookies:
+                headers.append("Set-Cookie: %s" % (c))
+
+        if expires is not None:
+            headers.append("Expires: %s" % (
+                    self.format_expire_date(expires, False)))
+        if expires is not None or cookies or nph:
+            headers.append("Date: %s" % (self.format_expire_date(0, False)))
+        if self.cache:
+            headers.append("Pragma: no-cache")
+        for hdr in other_headers:
+            headers.append(hdr[0:1].upper() + hdr[1:])
+        if ctype:
+            headers.append("Content-Type: %s" % (ctype))
+
+        return self.crlf.join(headers) + self.crlf + self.crlf
 
     #--------------------------------------------------------------------------
     def format_expire_date(self, etime = None, format_cookie = False):
