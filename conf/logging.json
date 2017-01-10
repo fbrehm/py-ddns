@@ -1,0 +1,58 @@
+{
+    "version": 1,
+    "disable_existing_loggers": "False",
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "level": "INFO",
+            "formatter": "dyndns_format"
+        },
+        "access": {
+            "class": "logging.handlers.TimedRotatingFileHandler",
+            "formatter": "access_format",
+            "filename": "logs/access.log",
+            "when": "midnight",
+            "backupCount": 60
+        },
+        "dyndns": {
+            "class": "logging.handlers.TimedRotatingFileHandler",
+            "level": "DEBUG",
+            "formatter": "dyndns_format",
+            "filename": "logs/dyndns.log",
+            "when": "midnight",
+            "backupCount": 60
+        }
+    },
+    "formatters": {
+        "dyndns_format": {
+            "format": "[%(asctime)s] [%(levelname)s] %(name)s [%(filename)s(%(lineno)d) %(funcName)s()] %(message)s"
+        },
+        "access_format": {
+            "format": "[%(asctime)s] %(message)s"
+        }
+    },
+    "root": {
+        "level": "DEBUG",
+        "handlers": [
+            "console",
+            "dyndns"
+        ]
+    },
+    "loggers": {
+        "werkzeug": {
+            "level": "WARNING",
+            "propagate": "yes",
+            "_comment": "These two handlers will write HTTP access logs twice, but is easier for both admins and machines to work with",
+            "handlers": [
+                "access"
+            ]
+        },
+        "dyndns": {
+            "level": "DEBUG",
+            "propagate": "yes"
+        },
+        "paramiko.transport": {
+            "level": "INFO"
+        }
+    }
+}
