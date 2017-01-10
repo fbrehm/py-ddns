@@ -22,7 +22,7 @@ libdir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'lib'))
 sys.path.insert(0, libdir)
 
 from dyndns import configure_logging
-#from dyndns import create_app
+from dyndns import create_app
 
 LOG = logging.getLogger("dyndns")
 
@@ -37,13 +37,13 @@ def main():
     configure_logging()
 
     LOG.info("Starting dyndns ...")
-#    app = create_app()
-#    app.run(
-#            threaded=True,
-#            host=app.config.get('HOST', '0.0.0.0'),
-#            port=app.config.get('SERVER_PORT', 5000),
-#            debug=app.config.get('DEBUG', True)
-#            )
+    app = create_app()
+    app.run(
+        threaded=True,
+        host=app.config.get('HOST', '0.0.0.0'),
+        port=app.config.get('SERVER_PORT', 5000),
+        debug=app.config.get('DEBUG', True)
+    )
 
 #------------------------------------------------------------------------------
 def shutdown():
