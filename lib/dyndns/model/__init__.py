@@ -23,8 +23,6 @@ from sqlalchemy.ext.declarative import declarative_base
 from ..constants import BASE_DIR, CFG_DIR, LOGGING_CONFIG, DEFAULT_DYNDNS_CONFIG
 from ..constants import STATIC_DIR, TEMPLATES_DIR
 
-#from ..model_config import DB_CONFIG_FILE, DSN
-
 db_session = None
 
 LOG = logging.getLogger(__name__)
