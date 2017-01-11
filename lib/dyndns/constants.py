@@ -20,6 +20,10 @@ DEFAULT_DYNDNS_CONFIG = 'dyndns.cfg'
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
 
+GLOBAL_CONFIG_DIR = os.sep + os.path.join("etc", "dyndns")
+GLOBAL_CONFIG_FILE = os.path.join(GLOBAL_CONFIG_DIR, 'dyndns.json')
+GLOBAL_LOGGING_CONFIG = os.path.join(GLOBAL_CONFIG_DIR, "logging.json")
+
 #==============================================================================
 
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4

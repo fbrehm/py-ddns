@@ -30,7 +30,7 @@ from flask import request
 # Own modules
 from .constants import STATIC_DIR, TEMPLATES_DIR
 
-from .model import engine, db_session
+from .model import db_session
 
 LOG = logging.getLogger(__name__)
 

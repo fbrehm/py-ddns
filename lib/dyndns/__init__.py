@@ -20,12 +20,14 @@ from flask import Flask
 
 # Own modules
 from .constants import BASE_DIR, CFG_DIR, LOGGING_CONFIG, DEFAULT_DYNDNS_CONFIG
-from .constants import STATIC_DIR, TEMPLATES_DIR
+from .constants import STATIC_DIR, TEMPLATES_DIR, GLOBAL_CONFIG_FILE, GLOBAL_LOGGING_CONFIG
 
-from .model_config import DB_CONFIG_FILE, DSN
+#from .model_config import DB_CONFIG_FILE, DSN
+from .model import create_session
 
 from .views import api
 
+from .tools import pp, to_bool
 
 # Constants
 
@@ -45,8 +47,14 @@ def configure_logging():
 
     logging_config_json = {}
 
+    # Loading default logging configuration
     with open(LOGGING_CONFIG) as logging_config_file:
         logging_config_json = json.load(logging_config_file)
+
+    # Loading logging configuration from /etc/dyndns/logging.json
+    if os.path.exists(GLOBAL_LOGGING_CONFIG):
+        with open(LOGGING_CONFIG) as logging_config_file:
+            logging_config_json = json.load(logging_config_file)
 
     logging.basicConfig(level=logging.INFO)
     logging.config.dictConfig(logging_config_json)
@@ -66,12 +74,33 @@ def create_app():
     app = Flask(__name__, static_folder=STATIC_DIR)
 
     # Update logger
-    app.logger_name = "dashboard"
+    app.logger_name = "dyndns"
 
     # load default configuration
-    LOG.info("Loading default dyndns config from {0}"
-                .format(DEFAULT_DYNDNS_CONFIG))
-    app.config.from_pyfile(DEFAULT_DYNDNS_CONFIG, silent=True)
+    def_conf_class = 'dyndns.default_config.ProductionConfig'
+    env = 'prod'
+    env_keys = ('DYNDNS_ENVIRONMENT', 'DYNDNS_ENV')
+    for key in env_keys:
+        if key in os.environ:
+            oenv = os.environ[key].lower()
+            if oenv == 'test' or oenv == 'testing':
+                env = 'test'
+                break
+            elif oenv == 'developing' or oenv == 'develop' or oenv == 'dev':
+                env = 'dev'
+                break
+    if env == 'test':
+        def_conf_class = 'dyndns.default_config.TestingConfig'
+    elif env == 'dev':
+        def_conf_class = 'dyndns.default_config.DevelopmentConfig'
+    LOG.debug("Default configuration class: {0!r}".format(def_conf_class))
+    app.config.from_object(def_conf_class)
+
+    # overwrite with custom configuration from /etc/dyndns/dyndns.json
+    if os.path.exists(GLOBAL_CONFIG_FILE):
+        LOG.info("Loading dyndns config from file {0!r}".format(
+                GLOBAL_CONFIG_FILE))
+        app.config.from_json(GLOBAL_CONFIG_FILE)
 
     # overwrite with custom configuration path (via env)
     dyndns_config = os.environ.get('DYNDNS_CONFIG')
@@ -79,15 +108,16 @@ def create_app():
     if dyndns_config:
         LOG.info("Loading dyndns config DYNDNS_CONFIG={0!r}"
                     .format(dyndns_config))
-        app.config.from_envvar('DYNDNS_CONFIG')
+        app.config.from_envvar('DYNDNS_CONFIG', silent=True)
+
+    LOG.debug("Using configuration:\n{}".format(pp(app.config)))
 
     # register application parts
     LOG.info("Initializing blueprints ...")
     app.register_blueprint(api)
     LOG.info("Blueprints initialized")
 
-    LOG.debug("Database configuration file: %r", DB_CONFIG_FILE)
-    LOG.info("Log in to database: %r", DSN)
+    create_session(app)
     LOG.info("Flask application created")
 
     return app

@@ -3,13 +3,23 @@
 
 import pprint
 import copy
+import re
+import locale
 
 from six import PY2, PY3
 
+RE_YES = re.compile(r'^\s*(?:y(?:es)?|true)\s*$', re.IGNORECASE)
+RE_NO = re.compile(r'^\s*(?:no?|false|off)\s*$', re.IGNORECASE)
+PAT_TO_BOOL_TRUE = locale.nl_langinfo(locale.YESEXPR)
+RE_TO_BOOL_TRUE = re.compile(PAT_TO_BOOL_TRUE)
+PAT_TO_BOOL_FALSE = locale.nl_langinfo(locale.NOEXPR)
+RE_TO_BOOL_FALSE = re.compile(PAT_TO_BOOL_FALSE)
+
+
 
 # =============================================================================
-def pp(data, indent=4):
-    p = pprint.PrettyPrinter(indent=indent)
+def pp(data, indent=4, width=120):
+    p = pprint.PrettyPrinter(indent=indent, width=width)
     return p.pformat(data)
 
 # =============================================================================
@@ -78,6 +88,73 @@ def encode_struct(struct, encoding='utf-8'):
     else:
         result = to_str(struct, encoding)
     return result
+
+
+# =============================================================================
+def to_bool(value):
+    """
+    Converter from string to boolean values (e.g. from configurations)
+    """
+
+    if not value:
+        return False
+
+    try:
+        v_int = int(value)
+    except ValueError:
+        pass
+    except TypeError:
+        pass
+    else:
+        if v_int == 0:
+            return False
+        else:
+            return True
+
+    global PAT_TO_BOOL_TRUE
+    global RE_TO_BOOL_TRUE
+    global PAT_TO_BOOL_FALSE
+    global RE_TO_BOOL_FALSE
+
+    c_yes_expr = locale.nl_langinfo(locale.YESEXPR)
+    if c_yes_expr != PAT_TO_BOOL_TRUE:
+        PAT_TO_BOOL_TRUE = c_yes_expr
+        RE_TO_BOOL_TRUE = re.compile(PAT_TO_BOOL_TRUE)
+    # log.debug("Current pattern for 'yes': %r.", c_yes_expr)
+
+    c_no_expr = locale.nl_langinfo(locale.NOEXPR)
+    if c_no_expr != PAT_TO_BOOL_FALSE:
+        PAT_TO_BOOL_FALSE = c_no_expr
+        RE_TO_BOOL_FALSE = re.compile(PAT_TO_BOOL_FALSE)
+    # log.debug("Current pattern for 'no': %r.", c_no_expr)
+
+    v_str = ''
+    if isinstance(value, str):
+        v_str = value
+        if PY2:
+            if isinstance(value, unicode):
+                v_str = value.encode('utf-8')
+    elif PY3 and isinstance(value, bytes):
+        v_str = value.decode('utf-8')
+    else:
+        v_str = str(value)
+
+    match = RE_YES.search(v_str)
+    if match:
+        return True
+    match = RE_TO_BOOL_TRUE.search(v_str)
+    if match:
+        return True
+
+    match = RE_NO.search(v_str)
+    if match:
+        return False
+    match = RE_TO_BOOL_FALSE.search(v_str)
+    if match:
+        return False
+
+    return bool(value)
+
 
 
 # =============================================================================
