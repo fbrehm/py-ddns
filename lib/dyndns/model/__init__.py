@@ -29,6 +29,10 @@ LOG = logging.getLogger(__name__)
 
 
 #------------------------------------------------------------------------------
+Base = declarative_base()
+
+
+#------------------------------------------------------------------------------
 def create_session():
 
     dsn = current_app.config['DATABASE_URI']
@@ -39,10 +43,7 @@ def create_session():
     engine = sqlalchemy.create_engine(dsn)
     db_session = scoped_session(
         sessionmaker(autocommit=False, autoflush=False, bind=engine))
-
-
-#------------------------------------------------------------------------------
-Base = declarative_base()
+    Base.query = db_session.query_property()
 
 
 #==============================================================================

@@ -2,7 +2,7 @@
 BEGIN WORK;
 
 CREATE TABLE IF NOT EXISTS users (
-    user_id uuid primary key DEFAULT uuid_generate_v4(),
+    user_id uuid NOT NULL primary key DEFAULT uuid_generate_v4(),
     user_name varchar(50) NOT NULL,
     full_name varchar(250),
     email varchar(250) NOT NULL,

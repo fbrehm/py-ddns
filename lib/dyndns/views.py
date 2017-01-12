@@ -12,6 +12,7 @@ from __future__ import absolute_import
 import os
 import logging
 from functools import wraps
+import crypt
 
 # Third party modules
 
@@ -33,6 +34,9 @@ from flask import request
 from .constants import STATIC_DIR, TEMPLATES_DIR, LOGIN_REALM
 
 from .model import db_session
+from .model.user import User
+
+from .tools import pp, to_bool
 
 LOG = logging.getLogger(__name__)
 
@@ -74,8 +78,28 @@ def check_auth(username, password):
     """This function is called to check if a username /
     password combination is valid.
     """
-    if username == 'admin' and password == 'secret':
-        return True
+
+    if not password:
+        LOG.debug("No password given for user {!r}.".format(username))
+        return False
+
+    user = User.query.filter(User.user_name == username).first()
+
+    if user:
+        LOG.debug("Found user:\n{}".format(pp(user)))
+        cur_pwd = user.passwd
+        enc_pwd = crypt.crypt(password, cur_pwd)
+        if enc_pwd == cur_pwd:
+            LOG.debug("Authorization for user {!r} confirmed.".format(username))
+            return True
+        else:
+            LOG.debug("Password {!r} does not match current password.".format(
+                password))
+            return False
+    else:
+        LOG.debug("No user found for username {!r}.".format(username))
+        return False
+
     LOG.debug("Got invalid username {u!r} and password {p!r}.".format(
         u=username, p=password))
     return False
