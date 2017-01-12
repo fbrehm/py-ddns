@@ -116,7 +116,8 @@ def create_app():
     app.register_blueprint(api)
     LOG.info("Blueprints initialized")
 
-    create_session(app)
+    with app.app_context():
+        create_session()
     LOG.info("Flask application created")
 
     return app

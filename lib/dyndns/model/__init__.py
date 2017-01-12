@@ -29,9 +29,9 @@ LOG = logging.getLogger(__name__)
 
 
 #------------------------------------------------------------------------------
-def create_session(app):
+def create_session():
 
-    dsn = app.config['DATABASE_URI']
+    dsn = current_app.config['DATABASE_URI']
     LOG.info("Creating database session with DSN {!r} ...".format(dsn))
 
     global db_session
