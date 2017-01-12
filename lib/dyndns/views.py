@@ -4,7 +4,7 @@
 @author: Frank Brehm
 @contact: frank@brehm-online.com
 @copyright: © 2010 - 2017 by Frank Brehm, Berlin
-@summary: All modules for Python DynDNS application
+@summary: Main view module for Python DynDNS application
 """
 from __future__ import absolute_import
 
@@ -14,6 +14,7 @@ import logging
 
 # Third party modules
 
+import werkzeug
 from werkzeug.datastructures import MultiDict
 
 from jinja2 import TemplateNotFound
@@ -41,6 +42,7 @@ api = Blueprint(
 )
 
 
+#------------------------------------------------------------------------------
 def gen_response(data):
     '''Generate flask response object from JSON depending on status
     '''
@@ -54,6 +56,8 @@ def gen_response(data):
     return response
 
 
+#------------------------------------------------------------------------------
+# Index page - normal HTML page
 @api.route('/', defaults={'page': 'index'})
 @api.route('/<page>/')
 def index(page):
@@ -65,4 +69,6 @@ def index(page):
         abort(404)
 
 
+#==============================================================================
 
+# vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4

@@ -16,7 +16,9 @@ import json
 
 # Third party modules
 
+import werkzeug
 from flask import Flask
+from flask import request
 
 # Own modules
 from .constants import BASE_DIR, CFG_DIR, LOGGING_CONFIG, DEFAULT_DYNDNS_CONFIG
@@ -25,6 +27,9 @@ from .constants import STATIC_DIR, TEMPLATES_DIR, GLOBAL_CONFIG_FILE, GLOBAL_LOG
 from .model import create_session
 
 from .views import api
+
+#import .view_api_v1
+from .view_api_v1 import api_version
 
 from .tools import pp, to_bool
 
@@ -110,6 +115,47 @@ def create_app():
         app.config.from_envvar('DYNDNS_CONFIG', silent=True)
 
     LOG.debug("Using configuration:\n{}".format(pp(app.config)))
+
+    #--------------------------------------------------------------------------
+    # Error handler for 401 - bad request
+    def handle_bad_request(e):
+        info = {
+            'p': request.path,
+            'u': request.url,
+            'm': request.method,
+            #'e': pp(request.environ),
+        }
+        LOG.info("Bad access to path {p!r} ({m} {u!r}).".format(**info))
+        #LOG.debug("Environment of request:\n{e}".format(**info))
+        return 'Bad request to {u!r}!'.format(**info)
+    app.register_error_handler(401, handle_bad_request)
+
+    #--------------------------------------------------------------------------
+    # Error handler for 403 - forbidden
+    def handle_forbidden(e):
+        info = {
+            'p': request.path,
+            'u': request.url,
+            'm': request.method,
+            #'e': pp(request.environ),
+        }
+        LOG.info("Access to path {p!r} ({m} {u!r}) is forbidden.".format(**info))
+        return 'Access for page {u!r} is forbidden!'.format(**info)
+    app.register_error_handler(403, handle_forbidden)
+
+    #--------------------------------------------------------------------------
+    # Error handler for 404 - Not found
+    def handle_not_found(e):
+        info = {
+            'p': request.path,
+            'u': request.url,
+            'm': request.method,
+            'e': pp(request.environ),
+        }
+        LOG.info("Path {p!r} ({m} {u!r}) to access not found.".format(**info))
+        LOG.debug("Environment of request:\n{e}".format(**info))
+        return 'The requested URL {u!r} was not found.'.format(**info)
+    app.register_error_handler(404, handle_not_found)
 
     # register application parts
     LOG.info("Initializing blueprints ...")
