@@ -49,9 +49,17 @@ def gen_response(data):
     '''
     response = jsonify(data)
     if 'status' in data:
-        if data['status'] is False:
+        state = data['status']
+        state_int = 0
+        try:
+            state_int = int(state)
+        except ValueError:
+            pass
+        if state_int and state_int >= 100 and state_int < 600:
+            response.status_code = state_int
+        elif state is False:
             response.status_code = 500
-        elif data['status'] == 'Not Found':
+        elif state.lower() == 'not found':
             response.status_code = 404
         else:
             response.status_code = 200
