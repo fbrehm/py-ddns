@@ -22,6 +22,8 @@ from flask import abort
 # Own modules
 from .model import db_session
 from .views import api
+from .views import requires_auth
+from .views import gen_response
 
 LOG = logging.getLogger(__name__)
 
@@ -33,6 +35,16 @@ api_version = '1.0'
 def api_root():
     LOG.info("Trying to get forbidden page {!r}.".format(request.path))
     abort(403)
+
+#------------------------------------------------------------------------------
+@api.route('/api/v1/status')
+@requires_auth
+def api_status():
+    info = {
+        'status': 'OK',
+        'descr': 'All Batteries loaded.',
+    }
+    return gen_response(info)
 
 
 #==============================================================================

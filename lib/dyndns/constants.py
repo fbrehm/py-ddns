@@ -24,6 +24,8 @@ GLOBAL_CONFIG_DIR = os.sep + os.path.join("etc", "dyndns")
 GLOBAL_CONFIG_FILE = os.path.join(GLOBAL_CONFIG_DIR, 'dyndns.json')
 GLOBAL_LOGGING_CONFIG = os.path.join(GLOBAL_CONFIG_DIR, "logging.json")
 
+LOGIN_REALM = "DynDNS Login Requiered"
+
 #==============================================================================
 
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4
