@@ -128,7 +128,8 @@ def create_app():
         }
         LOG.info("Bad access to path {p!r} ({m} {u!r}).".format(**info))
         #LOG.debug("Environment of request:\n{e}".format(**info))
-        ret = Response( 'Bad request to {u!r}!\n'.format(**info), 401)
+        ret = Response( 'Bad request to {u!r}!\n'.format(**info),
+        status=401, mimetype='text/plain')
         return ret
     app.register_error_handler(401, handle_bad_request)
 
@@ -142,7 +143,9 @@ def create_app():
             #'e': pp(request.environ),
         }
         LOG.info("Access to path {p!r} ({m} {u!r}) is forbidden.".format(**info))
-        ret = Response('Access for page {u!r} is forbidden!\n'.format(**info), 403)
+        ret = Response(
+            'Access for page {u!r} is forbidden!\n'.format(**info),
+            status=403, mimetype='text/plain')
         return ret
     app.register_error_handler(403, handle_forbidden)
 
@@ -157,7 +160,8 @@ def create_app():
         }
         LOG.info("Path {p!r} ({m} {u!r}) to access not found.".format(**info))
         LOG.debug("Environment of request:\n{e}".format(**info))
-        ret = Response('The requested URL {u!r} was not found.\n'.format(**info), 404)
+        ret = Response('The requested URL {u!r} was not found.\n'.format(**info),
+        status=404, mimetype='text/plain')
         return ret
     app.register_error_handler(404, handle_not_found)
 
