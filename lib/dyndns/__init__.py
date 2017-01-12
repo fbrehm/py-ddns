@@ -19,6 +19,7 @@ import json
 import werkzeug
 from flask import Flask
 from flask import request
+from flask import Response
 
 # Own modules
 from .constants import BASE_DIR, CFG_DIR, LOGGING_CONFIG, DEFAULT_DYNDNS_CONFIG
@@ -127,7 +128,8 @@ def create_app():
         }
         LOG.info("Bad access to path {p!r} ({m} {u!r}).".format(**info))
         #LOG.debug("Environment of request:\n{e}".format(**info))
-        return 'Bad request to {u!r}!'.format(**info)
+        ret = Response( 'Bad request to {u!r}!\n'.format(**info), 401)
+        return ret
     app.register_error_handler(401, handle_bad_request)
 
     #--------------------------------------------------------------------------
@@ -140,7 +142,8 @@ def create_app():
             #'e': pp(request.environ),
         }
         LOG.info("Access to path {p!r} ({m} {u!r}) is forbidden.".format(**info))
-        return 'Access for page {u!r} is forbidden!'.format(**info)
+        ret = Response('Access for page {u!r} is forbidden!\n'.format(**info), 403)
+        return ret
     app.register_error_handler(403, handle_forbidden)
 
     #--------------------------------------------------------------------------
@@ -154,7 +157,8 @@ def create_app():
         }
         LOG.info("Path {p!r} ({m} {u!r}) to access not found.".format(**info))
         LOG.debug("Environment of request:\n{e}".format(**info))
-        return 'The requested URL {u!r} was not found.'.format(**info)
+        ret = Response('The requested URL {u!r} was not found.\n'.format(**info), 404)
+        return ret
     app.register_error_handler(404, handle_not_found)
 
     # register application parts
