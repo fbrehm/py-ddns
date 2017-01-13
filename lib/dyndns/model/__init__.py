@@ -44,6 +44,8 @@ def create_session():
     db_session = scoped_session(
         sessionmaker(autocommit=False, autoflush=False, bind=engine))
     Base.query = db_session.query_property()
+    Base.__session__ = db_session
+    LOG.debug("db_session: {!r}".format(db_session))
 
 
 #==============================================================================

@@ -14,6 +14,11 @@ import logging
 import uuid
 
 # Third party modules
+try:
+    from flask import _app_ctx_stack as stack
+except ImportError:
+    from flask import _request_ctx_stack as stack
+
 from sqlalchemy import text
 from sqlalchemy import Column, Integer, String, Text, DateTime
 from sqlalchemy.dialects.postgresql import *
@@ -22,6 +27,7 @@ from sqlalchemy.dialects.postgresql import *
 # Own modules
 from . import Base
 from ..namespace import Namespace
+from . import db_session
 
 LOG = logging.getLogger(__name__)
 

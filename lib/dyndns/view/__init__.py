@@ -94,6 +94,7 @@ def check_auth(username, password):
     if user:
         LOG.debug("Found user:\n{}".format(pp(user)))
         cur_pwd = user.passwd
+        LOG.debug("Current encrypted password: {}".format(cur_pwd))
         enc_pwd = crypt.crypt(password, cur_pwd)
         if enc_pwd == cur_pwd:
             ctx.cur_user = user.to_namespace()

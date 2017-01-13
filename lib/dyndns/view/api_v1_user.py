@@ -11,6 +11,8 @@ from __future__ import absolute_import
 # Standard modules
 import os
 import logging
+import crypt
+import re
 
 # Third party modules
 
@@ -24,8 +26,11 @@ try:
 except ImportError:
     from flask import _request_ctx_stack as stack
 
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+
 # Own modules
-from ..model import db_session
+#from ..model import db_session
 from ..model.user import User
 
 from . import api
@@ -33,6 +38,14 @@ from . import requires_auth
 from . import gen_response
 
 LOG = logging.getLogger(__name__)
+
+digits_re = re.compile(r'\d')
+capitals_re = re.compile(r'[A-Z]')
+small_re = re.compile(r'[a-z]')
+specials_re = re.compile(r'[\.\:,;\-_~+*$%&\{\[\]\}^\r([\)\?/\'\"]')
+valid_re = re.compile(
+    r'^[\da-z\.\:,;\-_~+*$%&\{\[\]\}^\r([\)\?/\'\"]+$',
+    re.IGNORECASE)
 
 
 #------------------------------------------------------------------------------
@@ -53,6 +66,80 @@ def api_cur_user():
     }
     if ctx.cur_user.is_admin:
         info['current_user']['is_admin'] = True
+    return gen_response(info)
+
+
+#------------------------------------------------------------------------------
+@api.route('/api/v1/user/password/<new_password>')
+@requires_auth
+def api_cur_user_set_pwd(new_password):
+    ctx = stack.top
+    if not new_password:
+        info = {
+            'status': 420,
+            'response': "No password given.",
+        }
+        return gen_response(info)
+
+    enc_pwd = crypt.crypt(new_password, ctx.cur_user.passwd)
+    if enc_pwd == ctx.cur_user.passwd:
+        info = {
+            'status': 406,
+            'response': "New password is matching the old one, no changes.",
+        }
+        return gen_response(info)
+
+    errors = []
+    if len(new_password) < 8:
+        errors.append("New password is too short (min. 8 characters).")
+    if not valid_re.search(new_password):
+        errors.append("New password contains invalid characters.")
+    if not small_re.search(new_password):
+        errors.append("New password contains no small letters.")
+    if not capitals_re.search(new_password):
+        errors.append("New password contains no capitals.")
+    if not digits_re.search(new_password):
+        errors.append("New password contains no digits.")
+    if not specials_re.search(new_password):
+        errors.append("New password contains no special characters.")
+
+    if errors:
+        info = {
+            'status': 420,
+            'response': "Invalid password.",
+            'errors': errors,
+        }
+        return gen_response(info)
+
+    salt = crypt.mksalt(crypt.METHOD_SHA512)
+    enc_pwd = crypt.crypt(new_password, salt)
+    updates = {
+        'passwd': enc_pwd,
+        'modified': text('CURRENT_TIMESTAMP')
+    }
+    LOG.debug("Setting password for user {u!r} to {p!r} ...".format(
+        u=ctx.cur_user.user_name, p=enc_pwd))
+
+    db_session = User.__session__
+    try:
+        db_session.query(User).filter(
+            User.user_name == ctx.cur_user.user_name).update(updates, synchronize_session=False)
+        db_session.commit()
+    except SQLAlchemyError as e:
+        db_session.rollback()
+        info = {
+            'status': 500,
+            'response': 'Could not change password of user {!r}.'.format(ctx.cur_user.user_name),
+            'errors': [str(e)],
+        }
+        LOG.error("{c} on changing password of user {u!r}: {e}".format(
+            c=e.__class__.__name__, u=ctx.cur_user.user_name, e=e))
+        return gen_response(info)
+
+    info = {
+        'status': 'OK',
+        'response': "Successful set new password for user {!r}.".format(ctx.cur_user.user_name),
+    }
     return gen_response(info)
 
 
