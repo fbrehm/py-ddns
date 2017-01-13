@@ -23,6 +23,9 @@ from sqlalchemy.dialects.postgresql import *
 from . import Base
 from ..namespace import Namespace
 
+LOG = logging.getLogger(__name__)
+
+
 #------------------------------------------------------------------------------
 class User(Base):
 
@@ -94,6 +97,28 @@ class User(Base):
                     val = uuid.UUID(val)
                 setattr(user_ns, key, val)
         return user_ns
+
+    # -----------------------------------------------------
+    @classmethod
+    def get_user(cls, user_ident):
+
+        user_id = None
+        try:
+            user_id = uuid.UUID(user_ident)
+        except ValueError:
+            pass
+
+        user = None
+        if user_id:
+            user_id = str(user_id)
+            LOG.debug("Searching user by user_id {!r} ...".format(user_id))
+            user = cls.query.filter(cls.user_id == user_id).first()
+        else:
+            LOG.debug("Searching user by user_name {!r} ...".format(str(user_ident)))
+            user = cls.query.filter(cls.user_name == str(user_ident)).first()
+
+        return user
+
 
 #==============================================================================
 

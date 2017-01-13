@@ -98,7 +98,7 @@ def check_auth(username, password):
         if enc_pwd == cur_pwd:
             ctx.cur_user = user.to_namespace()
             LOG.debug("Authorization for user {!r} confirmed.".format(username))
-            LOG.debug("Current user:\n{}".format(pp(ctx.cur_user.__dict__)))
+            # LOG.debug("Current user:\n{}".format(pp(ctx.cur_user.__dict__)))
             return True
         else:
             LOG.debug("Password {!r} does not match current password.".format(

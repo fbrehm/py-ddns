@@ -30,6 +30,7 @@ from .model import create_session
 from .view import api
 
 import dyndns.view.api_v1
+import dyndns.view.api_v1_user
 
 from .tools import pp, to_bool
 
