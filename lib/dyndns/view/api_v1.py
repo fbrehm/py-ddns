@@ -20,10 +20,15 @@ from flask import request
 from flask import abort
 
 # Own modules
-from .model import db_session
-from .views import api
-from .views import requires_auth
-from .views import gen_response
+from ..model import db_session
+
+#from .views import api
+#from .views import requires_auth
+#from .views import gen_response
+
+from . import api
+from . import requires_auth
+from . import gen_response
 
 LOG = logging.getLogger(__name__)
 

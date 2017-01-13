@@ -27,10 +27,10 @@ from .constants import STATIC_DIR, TEMPLATES_DIR, GLOBAL_CONFIG_FILE, GLOBAL_LOG
 
 from .model import create_session
 
-from .views import api
+from .view import api
 
 #import .view_api_v1
-from .view_api_v1 import api_version
+from .view.api_v1 import api_version
 
 from .tools import pp, to_bool
 

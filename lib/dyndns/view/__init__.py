@@ -35,12 +35,12 @@ except ImportError:
     from flask import _request_ctx_stack as stack
 
 # Own modules
-from .constants import STATIC_DIR, TEMPLATES_DIR, LOGIN_REALM
+from ..constants import STATIC_DIR, TEMPLATES_DIR, LOGIN_REALM
 
-from .model import db_session
-from .model.user import User
+from ..model import db_session
+from ..model.user import User
 
-from .tools import pp, to_bool
+from ..tools import pp, to_bool
 
 LOG = logging.getLogger(__name__)
 
