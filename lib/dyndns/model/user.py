@@ -11,6 +11,7 @@ from __future__ import absolute_import
 # Standard modules
 import os
 import logging
+import uuid
 
 # Third party modules
 from sqlalchemy import text
@@ -20,6 +21,7 @@ from sqlalchemy.dialects.postgresql import *
 
 # Own modules
 from . import Base
+from ..namespace import Namespace
 
 #------------------------------------------------------------------------------
 class User(Base):
@@ -80,6 +82,18 @@ class User(Base):
 
         out += ", ".join(fields) + ")>"
         return out
+
+    # -----------------------------------------------------
+    def to_namespace(self):
+
+        user_ns = Namespace()
+        for key in self.__dict__:
+            if not key.startswith('_'):
+                val = self.__dict__[key]
+                if key == 'user_id':
+                    val = uuid.UUID(val)
+                setattr(user_ns, key, val)
+        return user_ns
 
 #==============================================================================
 

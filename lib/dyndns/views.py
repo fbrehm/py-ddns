@@ -29,6 +29,10 @@ from flask import jsonify
 from flask import render_template
 from flask import request
 
+try:
+    from flask import _app_ctx_stack as stack
+except ImportError:
+    from flask import _request_ctx_stack as stack
 
 # Own modules
 from .constants import STATIC_DIR, TEMPLATES_DIR, LOGIN_REALM
@@ -83,6 +87,8 @@ def check_auth(username, password):
         LOG.debug("No password given for user {!r}.".format(username))
         return False
 
+    ctx = stack.top
+
     user = User.query.filter(User.user_name == username).first()
 
     if user:
@@ -90,7 +96,9 @@ def check_auth(username, password):
         cur_pwd = user.passwd
         enc_pwd = crypt.crypt(password, cur_pwd)
         if enc_pwd == cur_pwd:
+            ctx.cur_user = user.to_namespace()
             LOG.debug("Authorization for user {!r} confirmed.".format(username))
+            LOG.debug("Current user:\n{}".format(pp(ctx.cur_user.__dict__)))
             return True
         else:
             LOG.debug("Password {!r} does not match current password.".format(
