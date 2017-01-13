@@ -19,12 +19,13 @@ from flask import jsonify
 from flask import request
 from flask import abort
 
+try:
+    from flask import _app_ctx_stack as stack
+except ImportError:
+    from flask import _request_ctx_stack as stack
+
 # Own modules
 from ..model import db_session
-
-#from .views import api
-#from .views import requires_auth
-#from .views import gen_response
 
 from . import api
 from . import requires_auth
@@ -45,10 +46,21 @@ def api_root():
 @api.route('/api/v1/status')
 @requires_auth
 def api_status():
+    ctx = stack.top
     info = {
         'status': 'OK',
         'descr': 'All Batteries loaded.',
+        'current_user': {
+            'id': ctx.cur_user.user_id,
+            'user_name': ctx.cur_user.user_name,
+            'full_name': ctx.cur_user.full_name,
+            'email': ctx.cur_user.email,
+            'max_hosts': ctx.cur_user.max_hosts,
+            'created': ctx.cur_user.created.isoformat(' '),
+        }
     }
+    if ctx.cur_user.is_admin:
+        info['current_user']['is_admin'] = True
     return gen_response(info)
 
 

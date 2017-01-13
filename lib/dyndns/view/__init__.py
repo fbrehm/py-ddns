@@ -89,7 +89,7 @@ def check_auth(username, password):
 
     ctx = stack.top
 
-    user = User.query.filter(User.user_name == username).first()
+    user = User.query.filter(User.user_name == username and not User.disabled).first()
 
     if user:
         LOG.debug("Found user:\n{}".format(pp(user)))

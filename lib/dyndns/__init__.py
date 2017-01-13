@@ -29,8 +29,7 @@ from .model import create_session
 
 from .view import api
 
-#import .view_api_v1
-from .view.api_v1 import api_version
+import dyndns.view.api_v1
 
 from .tools import pp, to_bool
 
