@@ -3,7 +3,7 @@
 """
 @author: Frank Brehm
 @contact: frank@brehm-online.com
-@copyright: © 2010 - 2017 by Frank Brehm, Berlin
+@copyright: © 2017 by Frank Brehm, Berlin
 @summary: Module for tsig_keys table in Python DynDNS application
 """
 from __future__ import absolute_import
@@ -45,7 +45,7 @@ class TsigKey(Base):
     description = Column(Text, nullable=True)
 
     # -----------------------------------------------------
-     def __init__(
+    def __init__(
         self, key_id=None, key_name=None, key_value=None, disabled=False,
             created=None, description=None):
 
@@ -79,6 +79,18 @@ class TsigKey(Base):
                 val = self.__dict__[key]
                 setattr(key_ns, key, val)
         return key_ns
+
+    # -----------------------------------------------------
+    @classmethod
+    def all_keys(cls):
+
+        keys = []
+
+        LOG.debug("Getting all TSIG keys ...")
+        for key in cls.query.all():
+            keys.append(key)
+
+        return keys
 
     # -----------------------------------------------------
     @classmethod

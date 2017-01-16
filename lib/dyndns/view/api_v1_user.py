@@ -3,8 +3,8 @@
 """
 @author: Frank Brehm
 @contact: frank@brehm-online.com
-@copyright: © 2010 - 2017 by Frank Brehm, Berlin
-@summary: All modules for Python DynDNS application
+@copyright: © 2017 by Frank Brehm, Berlin
+@summary: A module for user dependend routes in the Python DynDNS application
 """
 from __future__ import absolute_import
 

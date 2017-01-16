@@ -3,7 +3,7 @@
 """
 @author: Frank Brehm
 @contact: frank@brehm-online.com
-@copyright: © 2010 - 2017 by Frank Brehm, Berlin
+@copyright: © 2017 by Frank Brehm, Berlin
 @summary: Module for default configuration classes
 """
 from __future__ import absolute_import

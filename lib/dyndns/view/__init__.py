@@ -3,7 +3,7 @@
 """
 @author: Frank Brehm
 @contact: frank@brehm-online.com
-@copyright: © 2010 - 2017 by Frank Brehm, Berlin
+@copyright: © 2017 by Frank Brehm, Berlin
 @summary: Main view module for Python DynDNS application
 """
 from __future__ import absolute_import

@@ -3,7 +3,7 @@
 """
 @author: Frank Brehm
 @contact: frank@brehm-online.com
-@copyright: © 2010 - 2017 by Frank Brehm, Berlin
+@copyright: © 2017 by Frank Brehm, Berlin
 @summary: All modules for Python DynDNS application
 """
 from __future__ import absolute_import
@@ -31,6 +31,7 @@ from .view import api
 
 import dyndns.view.api_v1
 import dyndns.view.api_v1_user
+import dyndns.view.api_v1_key
 
 from .tools import pp, to_bool
 
@@ -39,7 +40,7 @@ from .tools import pp, to_bool
 LOG = logging.getLogger("dyndns")
 
 __author__ = 'Frank Brehm <frank@brehm-online.com>'
-__copyright__ = '(C) 2010 - 2017 by Frank Brehm, Berlin'
+__copyright__ = '(C) 2017 by Frank Brehm, Berlin'
 __contact__ = 'frank.brehm@profitbricks.com'
 __version__ = '0.3.1'
 __license__ = 'LGPLv3+'
