@@ -33,6 +33,8 @@ from sqlalchemy.exc import SQLAlchemyError
 #from ..model import db_session
 from ..model.key import TsigKey
 
+from ..tools import to_bool
+
 from . import api
 from . import requires_auth
 from . import gen_response
@@ -85,4 +87,45 @@ def api_show_key(key_id):
 
     return gen_response(info)
 
+#------------------------------------------------------------------------------
+@api.route('/api/v1/key/add', methods=['POST'])
+@requires_auth
+def api_add_key():
+    ctx = stack.top
+    if not ctx.cur_user.is_admin:
+        # Forbidden, if not an administrator
+        abort(403)
 
+    params = {}
+    if 'name' not in request.form or 'value' not in request.form:
+        errors = []
+        if 'name' not in request.form:
+            errors.append("No name for the key provided.")
+        if 'value' not in request.form:
+            errors.append("No value for the key provided.")
+        info = {
+            'status': 400,
+            'response': "Could not add key, necessary fields not given.",
+            'errors': errors,
+        }
+        return gen_response(info)
+
+    params['name'] = request.form['name']
+    params['value'] = request.form['value']
+    if 'disabled' in request.form:
+        params['disabled'] = to_bool(request.form['disabled'])
+    if 'enabled' in request.form and 'disabled' not in params:
+        if to_bool(request.form['enabled']):
+            params['disabled'] = False
+        else:
+            params['disabled'] = True
+    if 'description' in request.form:
+        params['description'] = request.form['description']
+
+    info = TsigKey.add_key(**params)
+    return gen_response(info)
+
+
+#==============================================================================
+
+# vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4

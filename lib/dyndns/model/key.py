@@ -17,11 +17,13 @@ import logging
 from sqlalchemy import text
 from sqlalchemy import Column, Integer, String, Text, DateTime
 from sqlalchemy.dialects.postgresql import *
+from sqlalchemy.exc import SQLAlchemyError
 
 
 # Own modules
 from . import Base
 from ..namespace import Namespace
+from ..tools import pp
 from . import db_session
 
 LOG = logging.getLogger(__name__)
@@ -109,11 +111,54 @@ class TsigKey(Base):
     @classmethod
     def get_keys_by_name(cls, key_name):
 
-        LOG.debug("Searching TSIG key by key name {!r} ...".format(str(key_ident)))
+        LOG.debug("Searching TSIG key by key name {!r} ...".format(str(key_name)))
         q = cls.query.filter(cls.key_name == key_name)
         LOG.debug("SQL statement: {}".format(q))
 
         return q.all()
+
+    # -----------------------------------------------------
+    @classmethod
+    def add_key(cls, name, value, disabled=False, description=None):
+
+        LOG.info("Adding key {!r} ...".format(name))
+
+        db_session = cls.__session__
+        params = {
+            'key_name': name,
+            'key_value': value,
+        }
+        if disabled is not None:
+            params['disabled'] = bool(disabled)
+        if description is not None:
+            params['description'] = str(description)
+        LOG.debug("Adding key: {}".format(pp(params)))
+        key = cls(**params)
+
+        try:
+            db_session.add(key)
+            db_session.commit()
+        except SQLAlchemyError as e:
+            db_session.rollback()
+            info = {
+                'status': 500,
+                'response': 'Could not add key {}.'.format(pp(params)),
+                'errors': [str(e)],
+            }
+            LOG.error("{c} adding key {k}: {e}".format(
+                c=e.__class__.__name__, k=pp(params), e=e))
+            return info
+
+        keys = cls.get_keys_by_name(name)
+        info = {
+            'status': 'OK',
+            'response': 'Added key {!r}.'.format(name),
+            'keys': [],
+        }
+        for key in keys:
+            info['keys'].append(key.to_namespace().__dict__)
+        LOG.debug("Found keys:\n{}".format(pp(info)))
+        return info
 
 
 #==============================================================================
