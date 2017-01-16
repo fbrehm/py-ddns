@@ -40,7 +40,7 @@ def main():
     app = create_app()
     app.run(
         threaded=True,
-        host=app.config.get('HOST', '0.0.0.0'),
+        host=app.config.get('HOST', '::'),
         port=app.config.get('SERVER_PORT', 5000),
         debug=app.config.get('DEBUG', True)
     )
