@@ -70,6 +70,31 @@ def api_cur_user():
 
 
 #------------------------------------------------------------------------------
+@api.route('/api/v1/users')
+@requires_auth
+def api_all_users():
+    ctx = stack.top
+    if not ctx.cur_user.is_admin:
+        # Forbidden, if not an administrator
+        abort(403)
+
+    users = User.all_users()
+
+    info = {
+        'status': 'OK',
+        'users': [],
+        'count': len(users)
+    }
+
+    for user in users:
+        u = user.to_namespace().__dict__
+        u['passwd'] = user.passwd[0:3] + ' ********'
+        info['users'].append(u)
+
+    return gen_response(info)
+
+
+#------------------------------------------------------------------------------
 @api.route('/api/v1/user/password/<new_password>')
 @requires_auth
 def api_cur_user_set_pwd(new_password):
@@ -167,7 +192,7 @@ def api_user_from_id(user_id):
             'user_name': user.user_name,
             'full_name': user.full_name,
             'email': user.email,
-            'passwd': user.passwd[0:3] + ' ...',
+            'passwd': user.passwd[0:3] + ' ********',
             'is_admin': user.is_admin,
             'is_sticky': user.is_sticky,
             'max_hosts': user.max_hosts,

@@ -106,6 +106,35 @@ class User(Base):
 
     # -----------------------------------------------------
     @classmethod
+    def all_users(cls, enabled=None, admin=None):
+
+        keys = []
+
+        LOG.debug("Getting all users ...")
+
+        filters = {}
+
+        if enabled is not None:
+            if bool(enabled):
+                filters['disabled'] = text('False')
+            else:
+                filters['disabled'] = text('True')
+
+        if admin is not None:
+            if bool(enabled):
+                filters['is_admin'] = text('True')
+            else:
+                filters['is_admin'] = text('False')
+
+        q = cls.query.order_by(User.user_name)
+        if filters:
+            q = cls.query.filter(**filters).order_by(User.user_name)
+        LOG.debug("SQL statement: {}".format(q))
+
+        return q.all()
+
+    # -----------------------------------------------------
+    @classmethod
     def get_user(cls, user_ident):
 
         user_id = None
@@ -115,13 +144,17 @@ class User(Base):
             pass
 
         user = None
+        q = None
         if user_id:
             user_id = str(user_id)
             LOG.debug("Searching user by user_id {!r} ...".format(user_id))
-            user = cls.query.filter(cls.user_id == user_id).first()
+            q = cls.query.filter(cls.user_id == user_id)
         else:
             LOG.debug("Searching user by user_name {!r} ...".format(str(user_ident)))
             user = cls.query.filter(cls.user_name == str(user_ident)).first()
+            q = cls.query.filter(cls.user_name == str(user_ident))
+        LOG.debug("SQL statement: {}".format(q))
+        user = q.first()
 
         return user
 

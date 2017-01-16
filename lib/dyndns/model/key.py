@@ -94,24 +94,26 @@ class TsigKey(Base):
 
     # -----------------------------------------------------
     @classmethod
-    def get_key(cls, key_ident):
+    def get_key_by_id(cls, key_ident):
 
-        key_id = None
-        try:
-            key_id = int(key_ident)
-        except ValueError:
-            pass
+        key_id = int(key_ident)
 
-        key = None
-        if key_id:
-            key_id = str(key_id)
-            LOG.debug("Searching TSIG key by key_id {!r} ...".format(key_id))
-            key = cls.query.filter(cls.key_id == key_id).first()
-        else:
-            LOG.debug("Searching TSIG key by key name {!r} ...".format(str(key_ident)))
-            key = cls.query.filter(cls.key_name == str(key_ident)).first()
+        LOG.debug("Searching TSIG key by key_id {!r} ...".format(key_id))
+        q = cls.query.filter(cls.key_id == str(key_id))
+        LOG.debug("SQL statement: {}".format(q))
 
-        return key
+        return q.first()
+
+
+    # -----------------------------------------------------
+    @classmethod
+    def get_keys_by_name(cls, key_name):
+
+        LOG.debug("Searching TSIG key by key name {!r} ...".format(str(key_ident)))
+        q = cls.query.filter(cls.key_name == key_name)
+        LOG.debug("SQL statement: {}".format(q))
+
+        return q.all()
 
 
 #==============================================================================

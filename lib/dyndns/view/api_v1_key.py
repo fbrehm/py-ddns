@@ -61,4 +61,28 @@ def api_all_keys():
 
     return gen_response(info)
 
+#------------------------------------------------------------------------------
+@api.route('/api/v1/key/id/<int:key_id>')
+@requires_auth
+def api_show_key(key_id):
+    ctx = stack.top
+    if not ctx.cur_user.is_admin:
+        # Forbidden, if not an administrator
+        abort(403)
+
+    key = TsigKey.get_key_by_id(key_id)
+    if not key:
+        info = {
+            'status': 'Not found',
+            'response': 'TSIG key {!r} not found.'.format(key_id)
+        }
+        return gen_response(info)
+
+    info = {
+        'status': 'OK',
+        'key': key.to_namespace().__dict__,
+    }
+
+    return gen_response(info)
+
 
