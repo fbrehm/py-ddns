@@ -115,7 +115,7 @@ class TsigKey(Base):
         q = cls.query.filter(cls.key_name == key_name)
         LOG.debug("SQL statement: {}".format(q))
 
-        return q.all()
+        return q.first()
 
     # -----------------------------------------------------
     @classmethod
@@ -142,22 +142,28 @@ class TsigKey(Base):
             db_session.rollback()
             info = {
                 'status': 500,
-                'response': 'Could not add key {}.'.format(pp(params)),
-                'errors': [str(e)],
+                'response': 'bla',
+                'errors': [],
             }
+            if e.__class__.__name__ == 'IntegrityError':
+                info['response'] = 'Could not add key with name {!r}.'.format(name)
+                info['errors'] = ['There is already existing a key with this name.']
+            else:
+                info['response'] = 'Could not add key {}.'.format(pp(params))
+                info['errors'] = [str(e)]
+
             LOG.error("{c} adding key {k}: {e}".format(
                 c=e.__class__.__name__, k=pp(params), e=e))
             return info
 
-        keys = cls.get_keys_by_name(name)
+        key = cls.get_keys_by_name(name)
         info = {
             'status': 'OK',
             'response': 'Added key {!r}.'.format(name),
-            'keys': [],
+            'key': None,
         }
-        for key in keys:
-            info['keys'].append(key.to_namespace().__dict__)
-        LOG.debug("Found keys:\n{}".format(pp(info)))
+        info['keys'] = key.to_namespace().__dict__
+        LOG.debug("Found created key:\n{}".format(pp(info)))
         return info
 
 
