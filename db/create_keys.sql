@@ -11,7 +11,8 @@ CREATE TABLE IF NOT EXISTS tsig_keys (
     key_value varchar(250) NOT NULL,
     disabled bool NOT NULL DEFAULT False,
     created timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    description text
+    description text,
+    CONSTRAINT unique_key_name UNIQUE(key_name)
 );
 
 COMMIT;
