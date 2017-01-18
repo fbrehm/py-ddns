@@ -32,6 +32,7 @@ from .view import api
 import dyndns.view.api_v1
 import dyndns.view.api_v1_user
 import dyndns.view.api_v1_key
+import dyndns.view.api_v1_zone
 
 from .tools import pp, to_bool
 
@@ -42,7 +43,7 @@ LOG = logging.getLogger("dyndns")
 __author__ = 'Frank Brehm <frank@brehm-online.com>'
 __copyright__ = '(C) 2017 by Frank Brehm, Berlin'
 __contact__ = 'frank.brehm@profitbricks.com'
-__version__ = '0.3.1'
+__version__ = '0.4.1'
 __license__ = 'LGPLv3+'
 
 

@@ -5,6 +5,8 @@
 
 \ir create_keys.sql
 
+\ir create_zones.sql
+
 \q
 
 -- vim: ts=4 et

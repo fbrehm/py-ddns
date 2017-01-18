@@ -27,7 +27,6 @@ from sqlalchemy.dialects.postgresql import *
 # Own modules
 from . import Base
 from ..namespace import Namespace
-from . import db_session
 
 LOG = logging.getLogger(__name__)
 
