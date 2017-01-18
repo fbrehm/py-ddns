@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS users (
     CONSTRAINT unique_user_name UNIQUE(user_name)
 );
 
--- eiPo4vo|i&ye
+-- password: password
 INSERT INTO users (
     user_name, full_name, email,
     passwd,
@@ -25,30 +25,8 @@ INSERT INTO users (
 )
 VALUES (
     'admin', 'Administrator', 'webmaster@brehm-online.com',
-    '$6$HA8X/TJ0SY7$MYqi7oJG9CnJ/SllbjwRgnzheTaHRpUnlwidZPQYtxK6WCZ05VnksAkxdCg4FNG2r.Y5F1t5Bfcpl2zEdWeM31',
+    '$6$jQbHxAyrUw.c3M5g$CtaKH7BouFOPXLN.YL3zYpxB.sGi6WBUYKREsfHQ5fdJ99Wli6gGujtZgPADRcU0S0RvSCMh69iTY0SrAeeFD0',
     True, True, NULL, 'The default administrator of tis application.'
-);
-
-INSERT INTO users (
-    user_name, full_name, email,
-    passwd,
-    is_admin, is_sticky, max_hosts, description
-)
-VALUES (
-    'frank', 'Frank Brehm', 'frank@brehm-online.com',
-    '$6$cX.uoegn$QJ4gODV46s22yZL5568YNM/TqhlRqVOK42ulOijyMRZN4A049BLsbTB/M/8XO/rJwFs8w4sSS7mEPsdZtyzQI1',
-    True, False, NULL, 'Ich höchstpersönlich.'
-);
-
-INSERT INTO users (
-    user_name, full_name, email,
-    passwd,
-    is_admin, is_sticky, max_hosts, description
-)
-VALUES (
-    'thomas', 'Thomas Schmidt', 'thomas@nexunus.net',
-    '$6$2ZG/G/Rzm$XmlHtFmQrLjU7LnCoQBmeMkvFhMTY..9HbR8ttSlHGVpOmAhSxofJV8Q/ltZmv1dM1mTDn8xLzofyQAZ.UqWv0',
-    True, False, NULL, 'Der andere.'
 );
 
 COMMIT;
