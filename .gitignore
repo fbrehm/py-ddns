@@ -9,3 +9,4 @@ trace
 .idea
 /*.egg-info
 MANIFEST
+/db/create_sample_data.sql
