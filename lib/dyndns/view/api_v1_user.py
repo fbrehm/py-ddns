@@ -20,6 +20,7 @@ from flask import current_app
 from flask import jsonify
 from flask import request
 from flask import abort
+from flask import url_for
 
 try:
     from flask import _app_ctx_stack as stack
@@ -65,7 +66,11 @@ def api_cur_user():
         }
     }
     if ctx.cur_user.is_admin:
-        info['current_user']['is_admin'] = True
+        url = url_for('.index', _external=True)
+        if not url.endswith('/'):
+            url += '/'
+        url += 'api/v1/user/id/{}'.format(ctx.cur_user.user_id)
+        info['url'] = url
     return gen_response(info)
 
 
