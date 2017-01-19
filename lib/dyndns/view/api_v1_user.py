@@ -47,10 +47,11 @@ specials_re = re.compile(r'[\.\:,;\-_~+*$%&\{\[\]\}^\r([\)\?/\'\"]')
 valid_re = re.compile(
     r'^[\da-z\.\:,;\-_~+*$%&\{\[\]\}^\r([\)\?/\'\"]+$',
     re.IGNORECASE)
+empty_re = re.compile(r'^\s*$')
 
 
 #------------------------------------------------------------------------------
-@api.route('/api/v1/user')
+@api.route('/api/v1/cur_user')
 @requires_auth
 def api_cur_user():
     ctx = stack.top
@@ -69,49 +70,44 @@ def api_cur_user():
         url = url_for('.index', _external=True)
         if not url.endswith('/'):
             url += '/'
-        url += 'api/v1/user/id/{}'.format(ctx.cur_user.user_id)
+        url += 'api/v1/user/{}'.format(ctx.cur_user.user_id)
         info['url'] = url
     return gen_response(info)
 
 
 #------------------------------------------------------------------------------
-@api.route('/api/v1/users')
+@api.route('/api/v1/cur_user/password')
 @requires_auth
-def api_all_users():
+def api_cur_user_get_passwd():
     ctx = stack.top
     if not ctx.cur_user.is_admin:
         # Forbidden, if not an administrator
         abort(403)
 
-    users = User.all_users()
-
     info = {
         'status': 'OK',
-        'users': [],
-        'count': len(users)
+        'pasword': ctx.cur_user.passwd
     }
-
-    for user in users:
-        u = user.to_namespace().__dict__
-        u['passwd'] = user.passwd[0:3] + ' ********'
-        info['users'].append(u)
-
     return gen_response(info)
 
 
 #------------------------------------------------------------------------------
-@api.route('/api/v1/user/password/<new_password>')
+@api.route('/api/v1/cur_user/password', methods=['PATCH'])
 @requires_auth
-def api_cur_user_set_pwd(new_password):
+def api_cur_user_set_pwd():
     ctx = stack.top
-    if not new_password:
+
+    new_pwd = None
+    if 'new_password' in request.form:
+        new_pwd = request.form['new_password']
+    else:
         info = {
-            'status': 420,
-            'response': "No password given.",
+            'status': 400,
+            'response': "No password given (form field 'new_password').",
         }
         return gen_response(info)
 
-    enc_pwd = crypt.crypt(new_password, ctx.cur_user.passwd)
+    enc_pwd = crypt.crypt(new_pwd, ctx.cur_user.passwd)
     if enc_pwd == ctx.cur_user.passwd:
         info = {
             'status': 406,
@@ -119,18 +115,35 @@ def api_cur_user_set_pwd(new_password):
         }
         return gen_response(info)
 
+    if empty_re.search(new_pwd):
+        info = {
+            'status': 400,
+            'response': "New password is empty.",
+        }
+        return gen_response(info)
+
+    min_len_passwd = 4
+    passwd_restrictions = {
+        'min_len': 4,
+        'small_chars_required': True,
+        'capitals_required': True,
+        'digits_required': False,
+        'special_chars_required': False,
+    }
+
     errors = []
-    if len(new_password) < 8:
-        errors.append("New password is too short (min. 8 characters).")
-    if not valid_re.search(new_password):
+    if len(new_pwd) < passwd_restrictions['min_len']:
+        errors.append("New password is too short (min. {} characters).".format(
+            passwd_restrictions['min_len']))
+    if not valid_re.search(new_pwd):
         errors.append("New password contains invalid characters.")
-    if not small_re.search(new_password):
+    if passwd_restrictions['small_chars_required'] and not small_re.search(new_pwd):
         errors.append("New password contains no small letters.")
-    if not capitals_re.search(new_password):
+    if passwd_restrictions['capitals_required'] and not capitals_re.search(new_pwd):
         errors.append("New password contains no capitals.")
-    if not digits_re.search(new_password):
+    if passwd_restrictions['digits_required'] and not digits_re.search(new_pwd):
         errors.append("New password contains no digits.")
-    if not specials_re.search(new_password):
+    if passwd_restrictions['special_chars_required'] and not specials_re.search(new_pwd):
         errors.append("New password contains no special characters.")
 
     if errors:
@@ -142,40 +155,54 @@ def api_cur_user_set_pwd(new_password):
         return gen_response(info)
 
     salt = crypt.mksalt(crypt.METHOD_SHA512)
-    enc_pwd = crypt.crypt(new_password, salt)
-    updates = {
-        'passwd': enc_pwd,
-        'modified': text('CURRENT_TIMESTAMP')
-    }
+    enc_pwd = crypt.crypt(new_pwd, salt)
+    updates = {'passwd': enc_pwd}
     LOG.debug("Setting password for user {u!r} to {p!r} ...".format(
         u=ctx.cur_user.user_name, p=enc_pwd))
 
-    db_session = User.__session__
-    try:
-        db_session.query(User).filter(
-            User.user_name == ctx.cur_user.user_name).update(updates, synchronize_session=False)
-        db_session.commit()
-    except SQLAlchemyError as e:
-        db_session.rollback()
-        info = {
-            'status': 500,
-            'response': 'Could not change password of user {!r}.'.format(ctx.cur_user.user_name),
-            'errors': [str(e)],
-        }
-        LOG.error("{c} on changing password of user {u!r}: {e}".format(
-            c=e.__class__.__name__, u=ctx.cur_user.user_name, e=e))
-        return gen_response(info)
+    info = User.update_user(ctx.cur_user.user_id, updates)
+    if info['status'] != 'OK':
+        info['response'] = 'Could not change password of user {!r}.'.format(
+            ctx.cur_user.user_name)
+    else:
+        info['response'] = "Successful set new password for user {!r}.".format(
+            ctx.cur_user.user_name)
 
-    info = {
-        'status': 'OK',
-        'response': "Successful set new password for user {!r}.".format(ctx.cur_user.user_name),
-    }
     return gen_response(info)
 
 
 #------------------------------------------------------------------------------
+@api.route('/api/v1/user')
+@api.route('/api/v1/users')
+@requires_auth
+def api_all_users():
+    ctx = stack.top
+    if not ctx.cur_user.is_admin:
+        # Forbidden, if not an administrator
+        abort(403)
+
+    users = User.all_users()
+    url_base = url_for('.index', _external=True)
+    url_base += 'api/v1/user/'
+
+    info = {
+        'status': 'OK',
+        'users': [],
+        'count': len(users)
+    }
+
+    for user in users:
+        u = user.to_namespace().__dict__
+        u['passwd'] = user.passwd[0:3] + ' ********'
+        u['url'] = url_base + str(user.user_id)
+        info['users'].append(u)
+
+    return gen_response(info)
+
+
+#------------------------------------------------------------------------------
+@api.route('/api/v1/user/<user_id>')
 @api.route('/api/v1/user/id/<user_id>')
-@api.route('/api/v1/user/name/<user_id>')
 @requires_auth
 def api_user_from_id(user_id):
     ctx = stack.top
@@ -190,6 +217,10 @@ def api_user_from_id(user_id):
             'response': 'User {!r} not found.'.format(user_id)
         }
         return gen_response(info)
+
+    url_base = url_for('.index', _external=True)
+    url_base += 'api/v1/user/'
+
     info = {
         'status': 'OK',
         'user': {
@@ -205,6 +236,48 @@ def api_user_from_id(user_id):
             'created': user.created.isoformat(' '),
             'modified': user.modified.isoformat(' '),
             'description': user.description,
+            'url': url_base + str(user.user_id),
+        }
+    }
+    return gen_response(info)
+
+
+#------------------------------------------------------------------------------
+@api.route('/api/v1/user/name/<user_id>')
+@requires_auth
+def api_user_from_name(user_id):
+    ctx = stack.top
+    if not ctx.cur_user.is_admin:
+        # Forbidden, if not an administrator
+        abort(403)
+
+    user = User.get_user(user_id)
+    if not user:
+        info = {
+            'status': 'Not found',
+            'response': 'User {!r} not found.'.format(user_id)
+        }
+        return gen_response(info)
+
+    url_base = url_for('.index', _external=True)
+    url_base += 'api/v1/user/'
+
+    info = {
+        'status': 'OK',
+        'user': {
+            'id': user.user_id,
+            'user_name': user.user_name,
+            'full_name': user.full_name,
+            'email': user.email,
+            'passwd': user.passwd[0:3] + ' ********',
+            'is_admin': user.is_admin,
+            'is_sticky': user.is_sticky,
+            'max_hosts': user.max_hosts,
+            'disabled': user.disabled,
+            'created': user.created.isoformat(' '),
+            'modified': user.modified.isoformat(' '),
+            'description': user.description,
+            'url': url_base + str(user.user_id),
         }
     }
     return gen_response(info)

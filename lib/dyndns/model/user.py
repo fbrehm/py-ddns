@@ -22,11 +22,13 @@ except ImportError:
 from sqlalchemy import text
 from sqlalchemy import Column, Integer, String, Text, DateTime
 from sqlalchemy.dialects.postgresql import *
+from sqlalchemy.exc import SQLAlchemyError
 
 
 # Own modules
 from . import Base
 from ..namespace import Namespace
+from ..tools import pp
 
 LOG = logging.getLogger(__name__)
 
@@ -136,11 +138,15 @@ class User(Base):
     @classmethod
     def get_user(cls, user_ident):
 
+        LOG.debug("Searching user by {!r} ...".format(user_ident))
         user_id = None
-        try:
-            user_id = uuid.UUID(user_ident)
-        except ValueError:
-            pass
+        if isinstance(user_ident, uuid.UUID):
+            user_id = user_ident
+        else:
+            try:
+                user_id = uuid.UUID(user_ident)
+            except ValueError:
+                pass
 
         user = None
         q = None
@@ -157,6 +163,53 @@ class User(Base):
 
         return user
 
+    # -----------------------------------------------------
+    @classmethod
+    def update_user(cls, user_id, updates):
+
+        if not isinstance(updates, dict):
+            raise TypeError("Parameter 'updates' must be a dict.")
+
+        db_session = cls.__session__
+        if 'user_id' in updates:
+            del updates['user_id']
+
+        if updates.keys():
+            updates['modified'] = text('CURRENT_TIMESTAMP')
+            LOG.debug("Updating user with:\n{}".format(pp(updates)))
+            user = cls(**updates)
+            uid = str(user_id)
+            try:
+                q = db_session.query(cls).filter(
+                    cls.user_id == uid)
+                LOG.debug("Update query:\n{}".format(q))
+                q.update(updates, synchronize_session=False)
+#                db_session.query(cls).filter(
+#                    cls.user_id == user_id).update(
+#                    updates, synchronize_session=False)
+                db_session.commit()
+
+            except SQLAlchemyError as e:
+                db_session.rollback()
+                info = {
+                    'status': 500,
+                    'response': 'Could not change data of user {!r}.'.format(
+                        str(user_id)),
+                    'errors': [str(e)],
+                }
+                LOG.error("{c} updating data of user {i}: {e}\nUpdate data:\n{u}".format(
+                    c=e.__class__.__name__, i=user_id, e=e, u=pp(updates)))
+                return info
+
+        user = cls.get_user(user_id)
+        info = {
+            'status': 'OK',
+            'response': 'Updated user {!r}.'.format(str(user_id)),
+            'user': None,
+        }
+        info['user'] = user.to_namespace().__dict__
+        LOG.debug("Found updated user:\n{}".format(pp(info)))
+        return info
 
 #==============================================================================
 
