@@ -31,7 +31,14 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 # Own modules
-#from ..model import db_session
+from ..constants import PASSWD_RESTRICTIONS_MIN_LEN
+from ..constants import PASSWD_RESTRICTIONS_SMALL_CHARS_REQUIRED
+from ..constants import PASSWD_RESTRICTIONS_CAPITALS_REQUIRED
+from ..constants import PASSWD_RESTRICTIONS_DIGITS_REQUIRED
+from ..constants import PASSWD_RESTRICTIONS_SPECIAL_CHARS_REQUIRED
+
+from ..tools import pp
+
 from ..model.user import User
 
 from . import api
@@ -48,6 +55,9 @@ valid_re = re.compile(
     r'^[\da-z\.\:,;\-_~+*$%&\{\[\]\}^\r([\)\?/\'\"]+$',
     re.IGNORECASE)
 empty_re = re.compile(r'^\s*$')
+email_re = re.compile(
+    r'^[a-z0-9._%-+]+@[a-z0-9._%-]+.[a-z]{2,6}$',
+    re.IGNORECASE)
 
 
 #------------------------------------------------------------------------------
@@ -92,81 +102,138 @@ def api_cur_user_get_passwd():
 
 
 #------------------------------------------------------------------------------
+@api.route('/api/v1/cur_user', methods=['PATCH'])
+@requires_auth
+def api_cur_user_patch():
+    ctx = stack.top
+
+    user_data = {}
+    if 'password' in request.form:
+        user_data['password'] = request.form['password']
+    if 'full_name' in request.form:
+        user_data['full_name'] = request.form['full_name']
+    if 'email' in request.form:
+        user_data['email'] = request.form['email']
+
+    return update_user(ctx.cur_user.user_id, user_data, ctx)
+
+
+#------------------------------------------------------------------------------
 @api.route('/api/v1/cur_user/password', methods=['PATCH'])
 @requires_auth
 def api_cur_user_set_pwd():
     ctx = stack.top
 
-    new_pwd = None
-    if 'new_password' in request.form:
-        new_pwd = request.form['new_password']
-    else:
+    if 'new_password' not in request.form:
         info = {
             'status': 400,
             'response': "No password given (form field 'new_password').",
         }
         return gen_response(info)
 
-    enc_pwd = crypt.crypt(new_pwd, ctx.cur_user.passwd)
-    if enc_pwd == ctx.cur_user.passwd:
-        info = {
-            'status': 406,
-            'response': "New password is matching the old one, no changes.",
-        }
-        return gen_response(info)
+    user_data = {'password': request.form['new_password']}
+    return update_user(ctx.cur_user.user_id, user_data, ctx)
 
-    if empty_re.search(new_pwd):
-        info = {
-            'status': 400,
-            'response': "New password is empty.",
-        }
-        return gen_response(info)
 
-    min_len_passwd = 4
-    passwd_restrictions = {
-        'min_len': 4,
-        'small_chars_required': True,
-        'capitals_required': True,
-        'digits_required': False,
-        'special_chars_required': False,
-    }
+#------------------------------------------------------------------------------
+def update_user(user_id, user_data, ctx):
 
     errors = []
-    if len(new_pwd) < passwd_restrictions['min_len']:
-        errors.append("New password is too short (min. {} characters).".format(
-            passwd_restrictions['min_len']))
-    if not valid_re.search(new_pwd):
-        errors.append("New password contains invalid characters.")
-    if passwd_restrictions['small_chars_required'] and not small_re.search(new_pwd):
-        errors.append("New password contains no small letters.")
-    if passwd_restrictions['capitals_required'] and not capitals_re.search(new_pwd):
-        errors.append("New password contains no capitals.")
-    if passwd_restrictions['digits_required'] and not digits_re.search(new_pwd):
-        errors.append("New password contains no digits.")
-    if passwd_restrictions['special_chars_required'] and not specials_re.search(new_pwd):
-        errors.append("New password contains no special characters.")
+    updates = {}
+
+    passwd_restrictions = {
+        'min_len': PASSWD_RESTRICTIONS_MIN_LEN,
+        'small_chars_required': PASSWD_RESTRICTIONS_SMALL_CHARS_REQUIRED,
+        'capitals_required': PASSWD_RESTRICTIONS_CAPITALS_REQUIRED,
+        'digits_required': PASSWD_RESTRICTIONS_DIGITS_REQUIRED,
+        'special_chars_required': PASSWD_RESTRICTIONS_SPECIAL_CHARS_REQUIRED,
+    }
+
+    LOG.debug("Dot data of user {i!r} given:\n{d}".format(
+        i=str(user_id), d=pp(user_data)))
+
+    if 'password' in user_data:
+
+        new_pwd = user_data['password']
+        passwd_wrong = False
+        while True:
+
+            if empty_re.search(new_pwd):
+                errors.append("New password is empty.")
+                break
+
+            enc_pwd = crypt.crypt(new_pwd, ctx.cur_user.passwd)
+            if enc_pwd == ctx.cur_user.passwd:
+                LOG.debug("New password is matching the old password.")
+                break
+
+            if len(new_pwd) < passwd_restrictions['min_len']:
+                errors.append("New password is too short (min. {} characters).".format(
+                    passwd_restrictions['min_len']))
+                passwd_wrong = True
+            if not valid_re.search(new_pwd):
+                errors.append("New password contains invalid characters.")
+                passwd_wrong = True
+            if passwd_restrictions['small_chars_required'] and not small_re.search(new_pwd):
+                errors.append("New password contains no small letters.")
+                passwd_wrong = True
+            if passwd_restrictions['capitals_required'] and not capitals_re.search(new_pwd):
+                errors.append("New password contains no capitals.")
+                passwd_wrong = True
+            if passwd_restrictions['digits_required'] and not digits_re.search(new_pwd):
+                errors.append("New password contains no digits.")
+                passwd_wrong = True
+            if passwd_restrictions['special_chars_required'] and not specials_re.search(new_pwd):
+                errors.append("New password contains no special characters.")
+                passwd_wrong = True
+
+            if passwd_wrong:
+                break
+
+            salt = crypt.mksalt(crypt.METHOD_SHA512)
+            enc_pwd = crypt.crypt(new_pwd, salt)
+            updates['passwd'] = enc_pwd
+            LOG.debug("Setting password for user {u!r} to {p!r} ...".format(
+                u=ctx.cur_user.user_name, p=enc_pwd))
+            break
+
+    if 'full_name' in user_data:
+        if empty_re.search(user_data['full_name']):
+            errors.append("New full name is empty.")
+        else:
+            updates['full_name'] = user_data['full_name']
+
+    if 'email' in user_data:
+        if empty_re.search(user_data['email']):
+            errors.append("New email address is empty.")
+        elif not email_re.search(user_data['email']):
+            errors.append("Wrong E-Mail address {!r}.".format(user_data['email']))
+        else:
+            updates['email'] = user_data['email']
 
     if errors:
         info = {
-            'status': 420,
-            'response': "Invalid password.",
+            'status': 400,
+            'response': "Could not update user data.",
             'errors': errors,
         }
+        LOG.warn("Could not update data for user {i!r}:\n{e}".format(
+            i=str(user_id), e=pp(errors)))
         return gen_response(info)
 
-    salt = crypt.mksalt(crypt.METHOD_SHA512)
-    enc_pwd = crypt.crypt(new_pwd, salt)
-    updates = {'passwd': enc_pwd}
-    LOG.debug("Setting password for user {u!r} to {p!r} ...".format(
-        u=ctx.cur_user.user_name, p=enc_pwd))
+    if not updates.keys():
+        info = {
+            'status': 406,
+            'response': "No changes for user data found.",
+        }
+        LOG.warn("No changes for user {!r} found.".format(str(user_id)))
+        return gen_response(info)
 
-    info = User.update_user(ctx.cur_user.user_id, updates)
+    info = User.update_user(user_id, updates)
     if info['status'] != 'OK':
-        info['response'] = 'Could not change password of user {!r}.'.format(
-            ctx.cur_user.user_name)
+        info['response'] = 'Could not change data of user {!r}.'.format(user_id)
     else:
-        info['response'] = "Successful set new password for user {!r}.".format(
-            ctx.cur_user.user_name)
+        info['response'] = "Successful changed data for user {!r}.".format(user_id)
 
     return gen_response(info)
 

@@ -184,9 +184,6 @@ class User(Base):
                     cls.user_id == uid)
                 LOG.debug("Update query:\n{}".format(q))
                 q.update(updates, synchronize_session=False)
-#                db_session.query(cls).filter(
-#                    cls.user_id == user_id).update(
-#                    updates, synchronize_session=False)
                 db_session.commit()
 
             except SQLAlchemyError as e:
