@@ -40,6 +40,7 @@ from ..constants import PASSWD_RESTRICTIONS_SPECIAL_CHARS_REQUIRED
 from ..tools import pp
 
 from ..model.user import User
+from ..model.config import Config
 
 from . import api
 from . import requires_auth
@@ -141,6 +142,9 @@ def update_user(user_id, user_data, ctx):
     errors = []
     updates = {}
 
+    ml = Config.get('passwd_restrict_min_len')
+    LOG.debug("Got min_len from configuration: {!r}.".format(ml))
+
     passwd_restrictions = {
         'min_len': PASSWD_RESTRICTIONS_MIN_LEN,
         'small_chars_required': PASSWD_RESTRICTIONS_SMALL_CHARS_REQUIRED,
@@ -149,7 +153,7 @@ def update_user(user_id, user_data, ctx):
         'special_chars_required': PASSWD_RESTRICTIONS_SPECIAL_CHARS_REQUIRED,
     }
 
-    LOG.debug("Dot data of user {i!r} given:\n{d}".format(
+    LOG.debug("Got data of user {i!r} given:\n{d}".format(
         i=str(user_id), d=pp(user_data)))
 
     if 'password' in user_data:

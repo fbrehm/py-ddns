@@ -18,6 +18,7 @@ from flask import current_app
 import sqlalchemy
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.schema import MetaData
 
 # Own modules
 from ..constants import BASE_DIR, CFG_DIR, LOGGING_CONFIG, DEFAULT_DYNDNS_CONFIG
@@ -31,6 +32,7 @@ LOG = logging.getLogger(__name__)
 #------------------------------------------------------------------------------
 Base = declarative_base()
 
+metadata = MetaData()
 
 #------------------------------------------------------------------------------
 def create_session():

@@ -25,10 +25,11 @@ from sqlalchemy import text
 from sqlalchemy import Column, Integer, String, Text, DateTime
 from sqlalchemy.dialects.postgresql import *
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.schema import MetaData
 
 
 # Own modules
-from . import Base
+from . import Base, metadata
 from ..namespace import Namespace
 from ..tools import pp, to_bool
 from ..errors import ConfigNotFoundError
@@ -213,7 +214,7 @@ class Config(Base):
         if cfg_type == 'time_diff':
             days = 0
             secs = 0
-            match = cls.td_re(.search(value)
+            match = cls.td_re.search(value)
             if match:
                 if match.group(1) is None:
                     if match.group(2) is not None:
