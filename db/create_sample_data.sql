@@ -55,6 +55,14 @@ INSERT INTO zones (
     False, 'Testing'
 );
 
+INSERT INTO config (cfg_name, cfg_type, cfg_value)
+ VALUES ('passwd_restrict_min_len', 'int', '8'),
+        ('passwd_restrict_small_chars_required', 'bool', 'True'),
+        ('passwd_restrict_capitals_required', 'bool', 'True'),
+        ('passwd_restrict_digits_required', 'bool', 'True'),
+        ('passwd_restrict_special_chars_required', 'bool', 'True');
+
+
 COMMIT;
 
 \q

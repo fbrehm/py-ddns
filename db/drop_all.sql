@@ -10,6 +10,10 @@ DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS tsig_keys;
 DROP SEQUENCE IF EXISTS seq_key_id;
 
+DROP TABLE IF EXISTS config;
+
+DROP TYPE IF EXISTS config_type;
+
 COMMIT;
 
 \q
