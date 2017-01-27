@@ -3,7 +3,7 @@ BEGIN WORK;
 
 CREATE TYPE config_type AS ENUM (
     'bool', 'int', 'float', 'str', 'uuid', 'version',
-    'date', 'date_tz', 'time', 'timestamp', 'timestamp_tz', 'time_diff'
+    'date', 'time', 'time_tz', 'timestamp', 'timestamp_tz', 'time_diff'
 );
 
 CREATE TABLE IF NOT EXISTS config (

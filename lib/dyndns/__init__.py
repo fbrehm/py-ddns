@@ -43,7 +43,7 @@ LOG = logging.getLogger("dyndns")
 __author__ = 'Frank Brehm <frank@brehm-online.com>'
 __copyright__ = '(C) 2017 by Frank Brehm, Berlin'
 __contact__ = 'frank.brehm@profitbricks.com'
-__version__ = '0.4.1'
+__version__ = '0.5.1'
 __license__ = 'LGPLv3+'
 
 
