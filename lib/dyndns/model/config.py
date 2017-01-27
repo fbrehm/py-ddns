@@ -29,7 +29,14 @@ from sqlalchemy.schema import MetaData
 
 
 # Own modules
+from ..constants import PASSWD_RESTRICTIONS_MIN_LEN
+from ..constants import PASSWD_RESTRICTIONS_SMALL_CHARS_REQUIRED
+from ..constants import PASSWD_RESTRICTIONS_CAPITALS_REQUIRED
+from ..constants import PASSWD_RESTRICTIONS_DIGITS_REQUIRED
+from ..constants import PASSWD_RESTRICTIONS_SPECIAL_CHARS_REQUIRED
+
 from . import Base, metadata
+
 from ..namespace import Namespace
 from ..tools import pp, to_bool
 from ..errors import ConfigNotFoundError
@@ -148,6 +155,39 @@ class Config(Base):
 
         cfg = configs[0]
         return cls.cast_from_value(cfg.cfg_value, cfg.cfg_type)
+
+    # -----------------------------------------------------
+    @classmethod
+    def get_password_restrictions(cls):
+
+        passwd_restrictions = {
+            'min_len': PASSWD_RESTRICTIONS_MIN_LEN,
+            'small_chars_required': PASSWD_RESTRICTIONS_SMALL_CHARS_REQUIRED,
+            'capitals_required': PASSWD_RESTRICTIONS_CAPITALS_REQUIRED,
+            'digits_required': PASSWD_RESTRICTIONS_DIGITS_REQUIRED,
+            'special_chars_required': PASSWD_RESTRICTIONS_SPECIAL_CHARS_REQUIRED,
+        }
+
+        cfg_keys = []
+        for key in passwd_restrictions.keys():
+            cfg_keys.append('passwd_restrict_' + key)
+
+        q = cls.query.filter(cls.cfg_name.in_(cfg_keys))
+        LOG.debug("SQL statement: {}".format(q))
+
+        for cfg in q.all():
+            val = cfg.cfg_value
+            try:
+                val = cls.cast_from_value(cfg.cfg_value, cfg.cfg_type)
+            except ValueError as e:
+                LOG.error("Could not cast cfg value {k} into {t!r}: {v!r}".format(
+                    k=cfg.cfg_name, t=cfg.cfg_type, v=cfg.cfg_value))
+            key = cfg.cfg_name.replace('passwd_restrict_', '')
+            passwd_restrictions[key] = val
+
+        LOG.debug("Got password resrictions:\n{}".format(pp(passwd_restrictions)))
+
+        return passwd_restrictions
 
     # -----------------------------------------------------
     @classmethod
