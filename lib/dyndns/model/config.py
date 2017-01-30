@@ -24,16 +24,12 @@ except ImportError:
 from sqlalchemy import text
 from sqlalchemy import Column, Integer, String, Text, DateTime
 from sqlalchemy.dialects.postgresql import *
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from sqlalchemy.schema import MetaData
 
 
 # Own modules
-from ..constants import PASSWD_RESTRICTIONS_MIN_LEN
-from ..constants import PASSWD_RESTRICTIONS_SMALL_CHARS_REQUIRED
-from ..constants import PASSWD_RESTRICTIONS_CAPITALS_REQUIRED
-from ..constants import PASSWD_RESTRICTIONS_DIGITS_REQUIRED
-from ..constants import PASSWD_RESTRICTIONS_SPECIAL_CHARS_REQUIRED
+from ..constants import CONFIG
 
 from . import Base, metadata
 
@@ -142,7 +138,10 @@ class Config(Base):
 
     # -----------------------------------------------------
     @classmethod
-    def get(cls, cfg_name):
+    def _get(cls, cfg_name, for_json=False):
+
+        if cfg_name not in CONFIG:
+            raise ConfigNotFoundError(cfg_name)
 
         LOG.debug("Searching configuration {!r} ...".format(cfg_name))
 
@@ -154,18 +153,33 @@ class Config(Base):
             raise ConfigNotFoundError(cfg_name)
 
         cfg = configs[0]
-        return cls.cast_from_value(cfg.cfg_value, cfg.cfg_type)
+        return cls.cast_from_value(cfg.cfg_value, cfg.cfg_type, for_json=for_json)
+
+    # -----------------------------------------------------
+    @classmethod
+    def get(cls, cfg_name, for_json=False):
+
+        if cfg_name not in CONFIG:
+            raise ConfigNotFoundError(cfg_name)
+
+        try:
+            value = self._get(cfg_name, for_json=for_json)
+
+        except ConfigNotFoundError:
+            value = CONFIG[cfg_name]['default']
+
+        return value
 
     # -----------------------------------------------------
     @classmethod
     def get_password_restrictions(cls):
 
         passwd_restrictions = {
-            'min_len': PASSWD_RESTRICTIONS_MIN_LEN,
-            'small_chars_required': PASSWD_RESTRICTIONS_SMALL_CHARS_REQUIRED,
-            'capitals_required': PASSWD_RESTRICTIONS_CAPITALS_REQUIRED,
-            'digits_required': PASSWD_RESTRICTIONS_DIGITS_REQUIRED,
-            'special_chars_required': PASSWD_RESTRICTIONS_SPECIAL_CHARS_REQUIRED,
+            'min_len': CONFIG['passwd_restrictions_min_len']['default'],
+            'small_chars_required': CONFIG['passwd_restrictions_small_chars_required']['default'],
+            'capitals_required': CONFIG['passwd_restrictions_capitals_required']['default'],
+            'digits_required': CONFIG['passwd_restrictions_digits_required']['default'],
+            'passwd_restrictions_special_chars_required': CONFIG['passwd_restrictions_special_chars_required']['default'],
         }
 
         cfg_keys = []
@@ -191,7 +205,68 @@ class Config(Base):
 
     # -----------------------------------------------------
     @classmethod
-    def cast_from_value(cls, value, cfg_type):
+    def get_with_default(cls, cfg_name, default=None):
+
+        val = default
+        try:
+            val = cls.get(cfg_name)
+        except ConfigNotFoundError:
+            pass
+        return val
+
+    # -----------------------------------------------------
+    @classmethod
+    def get_debug(cls):
+
+        return cls.get('debug')
+
+    # -----------------------------------------------------
+    @classmethod
+    def set(cls, cfg_name, value, description=None):
+
+        if cfg_name not in CONFIG:
+            raise ConfigNotFoundError(cfg_name)
+
+        cfg_type = CONFIG[cfg_name]['type']
+
+        v = str(value)
+
+        LOG.info("Setting config parameter {p!r} to {v!r} ...".format(
+            p=cfg_name, v=value))
+
+        db_session = cls.__session__
+        params = {
+            'cfg_name': cfg_name,
+            'cfg_type': cfg_type,
+            'cfg_value': v
+        }
+        if description is not None:
+            params['description'] = str(description)
+
+        LOG.debug("Adding key: {}".format(pp(params)))
+        cfg = cls(**params)
+
+        try:
+            db_session.add(cls)
+            db_session.commit()
+        except IntegrityError as e:
+            updates = {
+                'cfg_value': v,
+                'modified': text('CURRENT_TIMESTAMP'),
+            }
+            if description is not None:
+                updates['description'] = str(description)
+            q = db_session.query(cls).filter(
+                cls.cfg_name == cfg_name)
+            LOG.debug("Update query:\n{}".format(q))
+            q.update(updates, synchronize_session=False)
+            db_session.commit()
+
+        return v
+
+    # -----------------------------------------------------
+    @classmethod
+    def cast_from_value(cls, value, cfg_type, for_json=False):
         """
         Tries to cast the given value into the given type.
 
@@ -225,19 +300,35 @@ class Config(Base):
 
         # Must be in the format '%Y-%m-%d'
         if cfg_type == 'date':
-            return datetime.datetime.strptime(value.strip(), '%Y-%m-%d').date()
+            d = datetime.datetime.strptime(value.strip(), '%Y-%m-%d').date()
+            if for_json:
+                return d.strftime('%Y-%m-%d')
+            else:
+                return d
 
         if cfg_type == 'time':
-            return datetime.datetime.strptime(value.strip(), '%H:%M:%S').time()
+            d = datetime.datetime.strptime(value.strip(), '%H:%M:%S').time()
+            if for_json:
+                return d.strftime('%H:%M:%S')
+            else:
+                return d
 
         if cfg_type == 'time_tz':
-            return datetime.datetime.strptime(value.strip(), '%H:%M:%S%z').time()
+            d = datetime.datetime.strptime(value.strip(), '%H:%M:%S%z').time()
+            if for_json:
+                return d.strftime('%H:%M:%S%z')
+            else:
+                return d
 
         if cfg_type == 'timestamp':
             match = cls.datetime_re.search(value)
             if match:
                 p_str = match.group(1) + ' ' + match.group(2)
-                return datetime.datetime.strptime(p_str, '%Y-%m-%d %H:%M:%S')
+                d = datetime.datetime.strptime(p_str, '%Y-%m-%d %H:%M:%S')
+                if for_json:
+                    return d.strftime('%Y-%m-%d %H:%M:%S')
+                else:
+                    return d
             raise ValueError("Invalid timestamp value {!r} found.".format(value))
 
         if cfg_type == 'timestamp_tz':
@@ -248,7 +339,11 @@ class Config(Base):
                     p_str += match.group(3)
                 else:
                     p_str += '+0000'
-                return datetime.datetime.strptime(p_str, '%Y-%m-%d %H:%M:%S%z')
+                d = datetime.datetime.strptime(p_str, '%Y-%m-%d %H:%M:%S%z')
+                if for_json:
+                    return d.strftime('%Y-%m-%d %H:%M:%S%z')
+                else:
+                    return d
             raise ValueError("Invalid timestamp value {!r} found.".format(value))
 
         if cfg_type == 'time_diff':
@@ -262,7 +357,12 @@ class Config(Base):
                     secs = int(match.group(3))
                 else:
                     days = int(match.group(1))
-                return datetime.timedelta(days, secs)
+                d = datetime.timedelta(days, secs)
+                if for_json:
+                    return "{d!d}days {s!d}seconds".format(
+                        d=d.days, s=d.seconds)
+                else:
+                    return d
             raise ValueError("Invalid time_diff value {!r} found.".format(value))
 
         raise TypeError("Invalid configuration type {!r} found.".format(cfg_type))

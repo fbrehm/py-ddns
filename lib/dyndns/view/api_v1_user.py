@@ -31,11 +31,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 # Own modules
-from ..constants import PASSWD_RESTRICTIONS_MIN_LEN
-from ..constants import PASSWD_RESTRICTIONS_SMALL_CHARS_REQUIRED
-from ..constants import PASSWD_RESTRICTIONS_CAPITALS_REQUIRED
-from ..constants import PASSWD_RESTRICTIONS_DIGITS_REQUIRED
-from ..constants import PASSWD_RESTRICTIONS_SPECIAL_CHARS_REQUIRED
+from ..constants import CONFIG
 
 from ..tools import pp
 

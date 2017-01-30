@@ -24,11 +24,15 @@ GLOBAL_CONFIG_DIR = os.sep + os.path.join("etc", "dyndns")
 GLOBAL_CONFIG_FILE = os.path.join(GLOBAL_CONFIG_DIR, 'dyndns.json')
 GLOBAL_LOGGING_CONFIG = os.path.join(GLOBAL_CONFIG_DIR, "logging.json")
 
-PASSWD_RESTRICTIONS_MIN_LEN = 4
-PASSWD_RESTRICTIONS_SMALL_CHARS_REQUIRED = True
-PASSWD_RESTRICTIONS_CAPITALS_REQUIRED = True
-PASSWD_RESTRICTIONS_DIGITS_REQUIRED = False
-PASSWD_RESTRICTIONS_SPECIAL_CHARS_REQUIRED = False
+CONFIG = {
+    'passwd_restrictions_min_len': {'type': 'int', 'default': 8},
+    'passwd_restrictions_small_chars_required': {'type': 'bool', 'default': True},
+    'passwd_restrictions_capitals_required': {'type': 'bool', 'default': True},
+    'passwd_restrictions_digits_required': {'type': 'bool', 'default': True},
+    'passwd_restrictions_special_chars_required': {'type': 'bool', 'default': True},
+    'debug': {'type': 'bool', 'default': False},
+    'model_version': {'type': 'version', 'default': '0.2.1'},
+}
 
 LOGIN_REALM = "DynDNS Login Requiered"
 
