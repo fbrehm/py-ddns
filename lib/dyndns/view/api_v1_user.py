@@ -40,6 +40,7 @@ from ..model.config import Config
 
 from . import api
 from . import requires_auth
+from . import requires_auth_set_passwd
 from . import gen_response
 
 LOG = logging.getLogger(__name__)
@@ -100,7 +101,7 @@ def api_cur_user_get_passwd():
 
 #------------------------------------------------------------------------------
 @api.route('/api/v1/cur_user', methods=['PATCH'])
-@requires_auth
+@requires_auth_set_passwd
 def api_cur_user_patch():
     ctx = stack.top
 

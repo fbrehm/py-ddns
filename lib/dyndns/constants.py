@@ -37,6 +37,9 @@ CONFIG = {
 
 LOGIN_REALM = "DynDNS Login Required"
 
+DEFAULT_ADMIN_NAME = 'admin'
+DEFAULT_ADMIN_PASSWD = 'password'
+
 #==============================================================================
 
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4

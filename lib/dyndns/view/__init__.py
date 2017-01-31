@@ -28,6 +28,7 @@ from flask import current_app
 from flask import jsonify
 from flask import render_template
 from flask import request
+from flask import url_for
 
 try:
     from flask import _app_ctx_stack as stack
@@ -36,6 +37,7 @@ except ImportError:
 
 # Own modules
 from ..constants import STATIC_DIR, TEMPLATES_DIR, LOGIN_REALM
+from ..constants import DEFAULT_ADMIN_NAME, DEFAULT_ADMIN_PASSWD
 
 from ..model import db_session
 from ..model.user import User
@@ -129,6 +131,34 @@ def authenticate():
 
 #------------------------------------------------------------------------------
 def requires_auth(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth = request.authorization
+        if not auth or not check_auth(auth.username, auth.password):
+            return authenticate()
+        if auth.username == DEFAULT_ADMIN_NAME and auth.password == DEFAULT_ADMIN_PASSWD:
+            url_base = url_for('.index', _external=True)
+            url = url_base + 'api/v1/cur_user'
+            curl_cmd = (
+                "curl -X PATCH --data 'password=<NEW_PASSWORD>' -i --basic --user {u}:{p} "
+                "-s -S {url!r}").format(u=DEFAULT_ADMIN_NAME, p=DEFAULT_ADMIN_PASSWD, url=url)
+            info = {
+                'status': 400,
+                'response': [
+                    'The user {u!r} has still the default password {p!r}.'.format(
+                        u=DEFAULT_ADMIN_NAME, p=DEFAULT_ADMIN_PASSWD),
+                    'Please change this password immediately by calling for instance:',
+                    '    {}'.format(curl_cmd),
+                    'or a similar action before you can proceed.',
+                ]
+            }
+            return gen_response(info)
+        return f(*args, **kwargs)
+    return decorated
+
+
+#------------------------------------------------------------------------------
+def requires_auth_set_passwd(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         auth = request.authorization

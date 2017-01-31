@@ -26,7 +26,7 @@ INSERT INTO users (
 VALUES (
     'admin', 'Administrator', 'webmaster@brehm-online.com',
     '$6$jQbHxAyrUw.c3M5g$CtaKH7BouFOPXLN.YL3zYpxB.sGi6WBUYKREsfHQ5fdJ99Wli6gGujtZgPADRcU0S0RvSCMh69iTY0SrAeeFD0',
-    True, True, NULL, 'The default administrator of tis application.'
+    True, True, NULL, 'The default administrator of this application.'
 );
 
 COMMIT;
