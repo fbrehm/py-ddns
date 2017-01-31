@@ -31,6 +31,7 @@ from .model.config import Config
 from .view import api
 
 import dyndns.view.api_v1
+import dyndns.view.api_v1_config
 import dyndns.view.api_v1_user
 import dyndns.view.api_v1_key
 import dyndns.view.api_v1_zone

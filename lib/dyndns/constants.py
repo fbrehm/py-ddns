@@ -25,11 +25,11 @@ GLOBAL_CONFIG_FILE = os.path.join(GLOBAL_CONFIG_DIR, 'dyndns.json')
 GLOBAL_LOGGING_CONFIG = os.path.join(GLOBAL_CONFIG_DIR, "logging.json")
 
 CONFIG = {
-    'passwd_restrictions_min_len': {'type': 'int', 'default': 8},
-    'passwd_restrictions_small_chars_required': {'type': 'bool', 'default': True},
-    'passwd_restrictions_capitals_required': {'type': 'bool', 'default': True},
-    'passwd_restrictions_digits_required': {'type': 'bool', 'default': True},
-    'passwd_restrictions_special_chars_required': {'type': 'bool', 'default': True},
+    'passwd_restrict_min_len': {'type': 'int', 'default': 8},
+    'passwd_restrict_small_chars_required': {'type': 'bool', 'default': True},
+    'passwd_restrict_capitals_required': {'type': 'bool', 'default': True},
+    'passwd_restrict_digits_required': {'type': 'bool', 'default': True},
+    'passwd_restrict_special_chars_required': {'type': 'bool', 'default': True},
     'debug': {'type': 'bool', 'default': False},
     'model_version': {'type': 'version', 'default': '0.2.1'},
 }

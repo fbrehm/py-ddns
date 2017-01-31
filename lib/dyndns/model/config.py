@@ -100,30 +100,21 @@ class Config(Base):
         self.modified = modified
         self.description = description
 
-        self.valid = False
-        self.default = None
-        self.value = self.cfg_value
-        self.value_for_json = self.cfg_value
-
-        if self.cfg_name and self.cfg_name in CONFIG:
-            self.valid = True
-            cfg_type = CONFIG[self.cfg_name]['type']
-            self.cfg_type = cfg_type
-            self.default = CONFIG[self.cfg_name]['default']
-            try:
-                self.value = self.cast_from_value(self.cfg_value, cfg_type)
-                self.value_for_json = self.cast_from_value(
-                    self.cfg_value, cfg_type, for_json=True)
-            except (ValueError, TypeError) as e:
-                LOG.error("Invalid value {v!r} for configuration {k!r} as type {t!r}: {e}".format(
-                    v=self.cfg_value, k=self.cfg_name, t=cfg_type, e=e))
-                self.valid = False
+        self.finish_init()
 
     # -----------------------------------------------------
     @orm.reconstructor
     def init_on_load(self):
         """Substitution for __init__() in case of loading from a query."""
 
+        self.finish_init()
+
+    # -----------------------------------------------------
+    def finish_init(self):
+
+        if getattr(self, 'intialized', False):
+            return
+
         self.valid = False
         self.default = None
         self.value = self.cfg_value
@@ -134,6 +125,8 @@ class Config(Base):
             cfg_type = CONFIG[self.cfg_name]['type']
             self.cfg_type = cfg_type
             self.default = CONFIG[self.cfg_name]['default']
+            if not self.description and 'description' in CONFIG[self.cfg_name]:
+                self.description = CONFIG[self.cfg_name]['description']
             try:
                 self.value = self.cast_from_value(self.cfg_value, cfg_type)
                 self.value_for_json = self.cast_from_value(
@@ -142,6 +135,8 @@ class Config(Base):
                 LOG.error("Invalid value {v!r} for configuration {k!r} as type {t!r}: {e}".format(
                     v=self.cfg_value, k=self.cfg_name, t=cfg_type, e=e))
                 self.valid = False
+
+        self.intialized = True
 
     # -----------------------------------------------------
     def __repr__(self):
@@ -180,6 +175,35 @@ class Config(Base):
         LOG.debug("SQL statement: {}".format(q))
 
         return q.all()
+
+    # -----------------------------------------------------
+    @classmethod
+    def all_valid_configs(cls):
+
+        keys = sorted(CONFIG.keys(), key=str.lower)
+        c = {}
+        configs = []
+        for cfg in cls.all_configs():
+            if cfg.valid:
+                cname = cfg.cfg_name
+                c[cname] = cfg
+        for cname in keys:
+            if cname in c:
+                cfg = c[cname]
+            else:
+                description = None
+                if 'description' in CONFIG[cname]:
+                    description = CONFIG[cname]['description']
+                cfg = cls(
+                    cfg_name=cname,
+                    cfg_type=CONFIG[cname]['type'],
+                    cfg_value=CONFIG[cname]['default'],
+                    description=description,
+                )
+                cfg.valid = True
+            configs.append(cfg)
+
+        return configs
 
     # -----------------------------------------------------
     @classmethod
@@ -226,11 +250,11 @@ class Config(Base):
     def get_password_restrictions(cls):
 
         passwd_restrictions = {
-            'min_len': CONFIG['passwd_restrictions_min_len']['default'],
-            'small_chars_required': CONFIG['passwd_restrictions_small_chars_required']['default'],
-            'capitals_required': CONFIG['passwd_restrictions_capitals_required']['default'],
-            'digits_required': CONFIG['passwd_restrictions_digits_required']['default'],
-            'passwd_restrictions_special_chars_required': CONFIG['passwd_restrictions_special_chars_required']['default'],
+            'min_len': CONFIG['passwd_restrict_min_len']['default'],
+            'small_chars_required': CONFIG['passwd_restrict_small_chars_required']['default'],
+            'capitals_required': CONFIG['passwd_restrict_capitals_required']['default'],
+            'digits_required': CONFIG['passwd_restrict_digits_required']['default'],
+            'special_chars_required': CONFIG['passwd_restrict_special_chars_required']['default'],
         }
 
         cfg_keys = []
