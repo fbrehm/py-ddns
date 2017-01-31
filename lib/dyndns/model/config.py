@@ -21,7 +21,7 @@ try:
 except ImportError:
     from flask import _request_ctx_stack as stack
 
-from sqlalchemy import text
+from sqlalchemy import orm, text
 from sqlalchemy import Column, Integer, String, Text, DateTime
 from sqlalchemy.dialects.postgresql import *
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
@@ -101,6 +101,7 @@ class Config(Base):
         self.description = description
 
         self.valid = False
+        self.default = None
         self.value = self.cfg_value
         self.value_for_json = self.cfg_value
 
@@ -108,6 +109,31 @@ class Config(Base):
             self.valid = True
             cfg_type = CONFIG[self.cfg_name]['type']
             self.cfg_type = cfg_type
+            self.default = CONFIG[self.cfg_name]['default']
+            try:
+                self.value = self.cast_from_value(self.cfg_value, cfg_type)
+                self.value_for_json = self.cast_from_value(
+                    self.cfg_value, cfg_type, for_json=True)
+            except (ValueError, TypeError) as e:
+                LOG.error("Invalid value {v!r} for configuration {k!r} as type {t!r}: {e}".format(
+                    v=self.cfg_value, k=self.cfg_name, t=cfg_type, e=e))
+                self.valid = False
+
+    # -----------------------------------------------------
+    @orm.reconstructor
+    def init_on_load(self):
+        """Substitution for __init__() in case of loading from a query."""
+
+        self.valid = False
+        self.default = None
+        self.value = self.cfg_value
+        self.value_for_json = self.cfg_value
+
+        if self.cfg_name and self.cfg_name in CONFIG:
+            self.valid = True
+            cfg_type = CONFIG[self.cfg_name]['type']
+            self.cfg_type = cfg_type
+            self.default = CONFIG[self.cfg_name]['default']
             try:
                 self.value = self.cast_from_value(self.cfg_value, cfg_type)
                 self.value_for_json = self.cast_from_value(
@@ -157,7 +183,7 @@ class Config(Base):
 
     # -----------------------------------------------------
     @classmethod
-    def _get(cls, cfg_name, for_json=False):
+    def _get(cls, cfg_name):
 
         if cfg_name not in CONFIG:
             raise ConfigNotFoundError(cfg_name)
@@ -169,25 +195,31 @@ class Config(Base):
 
         configs = q.all()
         if not configs:
-            raise ConfigNotFoundError(cfg_name)
+            return None
 
-        cfg = configs[0]
-        return cls.cast_from_value(cfg.cfg_value, cfg.cfg_type, for_json=for_json)
+        return configs[0]
 
     # -----------------------------------------------------
     @classmethod
-    def get(cls, cfg_name, for_json=False):
+    def get(cls, cfg_name):
 
         if cfg_name not in CONFIG:
             raise ConfigNotFoundError(cfg_name)
 
-        try:
-            value = cls._get(cfg_name, for_json=for_json)
+        cfg = cls._get(cfg_name)
+        if not cfg:
+            cfg_type = CONFIG[cfg_name]['type']
+            description = None
+            if 'description' in CONFIG[cfg_name]:
+                description = CONFIG[cfg_name]['description']
+            cfg = cls(
+                cfg_name=cfg_name,
+                cfg_type=CONFIG[cfg_name]['type'],
+                cfg_value=CONFIG[cfg_name]['default'],
+                description=description,
+            )
 
-        except ConfigNotFoundError:
-            value = CONFIG[cfg_name]['default']
-
-        return value
+        return cfg
 
     # -----------------------------------------------------
     @classmethod

@@ -34,7 +34,7 @@ CONFIG = {
     'model_version': {'type': 'version', 'default': '0.2.1'},
 }
 
-LOGIN_REALM = "DynDNS Login Requiered"
+LOGIN_REALM = "DynDNS Login Required"
 
 #==============================================================================
 

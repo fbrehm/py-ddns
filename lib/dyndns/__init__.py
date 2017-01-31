@@ -177,9 +177,11 @@ def create_app():
         create_session()
 
     root_logger = logging.getLogger()
-    debug = Config.get('debug')
+    debug_cfg = Config.get('debug')
+    LOG.debug("Got a {c} object for 'debug': {o!r}.".format(
+        c=debug_cfg.__class__.__name__, o=debug_cfg))
     lvl = 'INFO'
-    if debug:
+    if debug_cfg.value:
         root_logger.setLevel(logging.DEBUG)
         lvl = 'DEBUG'
     else:

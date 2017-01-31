@@ -11,22 +11,22 @@ from __future__ import absolute_import
 # Standard modules
 
 #------------------------------------------------------------------------------
-class Config(object):
+class Configuration(object):
     DEBUG = False
     TESTING = False
     JSON_AS_ASCII = False
     DATABASE_URI = 'postgres://dyndns@localhost:5432/dyndns'
 
 #------------------------------------------------------------------------------
-class ProductionConfig(Config):
+class ProductionConfig(Configuration):
     TESTING = False
 
 #------------------------------------------------------------------------------
-class DevelopmentConfig(Config):
+class DevelopmentConfig(Configuration):
     DEBUG = True
 
 #------------------------------------------------------------------------------
-class TestingConfig(Config):
+class TestingConfig(Configuration):
     TESTING = True
 
 #==============================================================================

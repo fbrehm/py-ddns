@@ -138,9 +138,6 @@ def update_user(user_id, user_data, ctx):
     errors = []
     updates = {}
 
-    ml = Config.get('passwd_restrict_min_len')
-    LOG.debug("Got min_len from configuration: {!r}.".format(ml))
-
     passwd_restrictions = Config.get_password_restrictions()
 
     LOG.debug("Got data of user {i!r} given:\n{d}".format(
