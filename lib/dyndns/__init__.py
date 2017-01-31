@@ -26,6 +26,7 @@ from .constants import BASE_DIR, CFG_DIR, LOGGING_CONFIG, DEFAULT_DYNDNS_CONFIG
 from .constants import STATIC_DIR, TEMPLATES_DIR, GLOBAL_CONFIG_FILE, GLOBAL_LOGGING_CONFIG
 
 from .model import create_session
+from .model.config import Config
 
 from .view import api
 
@@ -43,7 +44,7 @@ LOG = logging.getLogger("dyndns")
 __author__ = 'Frank Brehm <frank@brehm-online.com>'
 __copyright__ = '(C) 2017 by Frank Brehm, Berlin'
 __contact__ = 'frank.brehm@profitbricks.com'
-__version__ = '0.5.1'
+__version__ = '0.6.1'
 __license__ = 'LGPLv3+'
 
 
@@ -174,6 +175,16 @@ def create_app():
 
     with app.app_context():
         create_session()
+
+    root_logger = logging.getLogger()
+    debug = Config.get('debug')
+    lvl = 'INFO'
+    if debug:
+        root_logger.setLevel(logging.DEBUG)
+        lvl = 'DEBUG'
+    else:
+        root_logger.setLevel(logging.INFO)
+    LOG.info("Global logging level: {}".format(lvl))
     LOG.info("Flask application created")
 
     return app

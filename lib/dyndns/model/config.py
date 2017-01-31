@@ -82,7 +82,7 @@ class Config(Base):
     # days only - group 1
     td_pat += d_pat + r'|'
     # optional days before and seconds - groups 2 and 3
-    td_pat += r'(?:' + d_pat + r')?\s*' + s_pat
+    td_pat += r'(?:' + d_pat + r'\s*,?)?\s*' + s_pat
     # closing regex
     td_pat += r')\s*$'
 
@@ -100,6 +100,23 @@ class Config(Base):
         self.modified = modified
         self.description = description
 
+        self.valid = False
+        self.value = self.cfg_value
+        self.value_for_json = self.cfg_value
+
+        if self.cfg_name and self.cfg_name in CONFIG:
+            self.valid = True
+            cfg_type = CONFIG[self.cfg_name]['type']
+            self.cfg_type = cfg_type
+            try:
+                self.value = self.cast_from_value(self.cfg_value, cfg_type)
+                self.value_for_json = self.cast_from_value(
+                    self.cfg_value, cfg_type, for_json=True)
+            except (ValueError, TypeError) as e:
+                LOG.error("Invalid value {v!r} for configuration {k!r} as type {t!r}: {e}".format(
+                    v=self.cfg_value, k=self.cfg_name, t=cfg_type, e=e))
+                self.valid = False
+
     # -----------------------------------------------------
     def __repr__(self):
 
@@ -109,6 +126,8 @@ class Config(Base):
         fields.append("cfg_name=%r" % (self.cfg_name))
         fields.append("cfg_type=%r" % (self.cfg_type))
         fields.append("cfg_value=%r" % (self.cfg_value))
+        fields.append("valid=%r" % (self.valid))
+        fields.append("value=%r" % (self.value))
 
         out += ", ".join(fields) + ")>"
         return out
@@ -163,7 +182,7 @@ class Config(Base):
             raise ConfigNotFoundError(cfg_name)
 
         try:
-            value = self._get(cfg_name, for_json=for_json)
+            value = cls._get(cfg_name, for_json=for_json)
 
         except ConfigNotFoundError:
             value = CONFIG[cfg_name]['default']
@@ -359,13 +378,98 @@ class Config(Base):
                     days = int(match.group(1))
                 d = datetime.timedelta(days, secs)
                 if for_json:
-                    return "{d!d}days {s!d}seconds".format(
+                    return "{d!d} days, {s!d} seconds".format(
                         d=d.days, s=d.seconds)
                 else:
                     return d
             raise ValueError("Invalid time_diff value {!r} found.".format(value))
 
         raise TypeError("Invalid configuration type {!r} found.".format(cfg_type))
+
+    # -----------------------------------------------------
+    @classmethod
+    def cast_to_value(cls, value, cfg_type):
+        """
+        Reverse of cast_from_value().
+        Tries to cast the given value into a appropriate str
+        to store it in database.
+
+        """
+
+        LOG.debug("Trying to cast {v!r} from {t!r} into str ...".format(
+            v=value, t=cfg_type))
+
+        if cfg_type is None:
+            return None
+        if cfg_type in (
+                'str', 'version', 'bool', 'int', 'float', 'uuid'):
+            return str(value)
+
+        if cfg_type == 'date':
+            d = None
+            if isinstance(value, str):
+                d = cls.cast_from_value(value, 'date')
+            elif isinstance(value, datetime.date):
+                d = value
+            elif isinstance(value, datetime.datetime):
+                d = value.date()
+            else:
+                raise ValueError("Invalid value {!r} for a date.".format(value))
+            return d.strftime('%Y-%m-%d')
+
+        if cfg_type == 'time':
+            t = None
+            if isinstance(value, str):
+                t = cls.cast_from_value(value, 'time')
+            elif isinstance(value, datetime.time):
+                t = value
+            elif isinstance(value, datetime.datetime):
+                t = value.time()
+            else:
+                raise ValueError("Invalid value {!r} for a time.".format(value))
+            return t.strftime('%H:%M:%S')
+
+        if cfg_type == 'time_tz':
+            t = None
+            if isinstance(value, str):
+                t = cls.cast_from_value(value, 'time_tz')
+            elif isinstance(value, datetime.time):
+                t = value
+            elif isinstance(value, datetime.datetime):
+                t = value.time()
+            else:
+                raise ValueError("Invalid value {!r} for a time with timezone.".format(value))
+            return t.strftime('%H:%M:%S%z')
+
+        if cfg_type == 'timestamp':
+            d = None
+            if isinstance(value, str):
+                d = cls.cast_from_value(value, 'timestamp')
+            elif isinstance(value, datetime.datetime):
+                d = value
+            else:
+                raise ValueError("Invalid value {!r} for a timestamp.".format(value))
+            return d.strftime('%Y-%m-%d %H:%M:%S')
+
+        if cfg_type == 'timestamp_tz':
+            d = None
+            if isinstance(value, str):
+                d = cls.cast_from_value(value, 'timestamp_tz')
+            elif isinstance(value, datetime.datetime):
+                d = value
+            else:
+                raise ValueError("Invalid value {!r} for a timestamp with timezone.".format(value))
+            return d.strftime('%Y-%m-%d %H:%M:%S%z')
+
+        if cfg_type == 'time_diff':
+            d = None
+            if isinstance(value, str):
+                d = cls.cast_from_value(value, 'time_diff')
+            elif isinstance(value, datetime.timedelta):
+                d = value
+            else:
+                raise ValueError("Invalid value {!r} for a time_diff.".format(value))
+            return "{d!d} days, {s!d} seconds".format(d=d.days, s=d.seconds)
 
 #==============================================================================
 
