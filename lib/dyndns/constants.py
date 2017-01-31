@@ -32,6 +32,7 @@ CONFIG = {
     'passwd_restrict_special_chars_required': {'type': 'bool', 'default': True},
     'debug': {'type': 'bool', 'default': False},
     'model_version': {'type': 'version', 'default': '0.2.1'},
+    'zzz_blub': {'type': 'str', 'default': 'Blah'},
 }
 
 LOGIN_REALM = "DynDNS Login Required"

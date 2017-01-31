@@ -25,6 +25,7 @@ from sqlalchemy import orm, text
 from sqlalchemy import Column, Integer, String, Text, DateTime
 from sqlalchemy.dialects.postgresql import *
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
+from sqlalchemy.orm.exc import FlushError
 from sqlalchemy.schema import MetaData
 
 
@@ -110,9 +111,9 @@ class Config(Base):
         self.finish_init()
 
     # -----------------------------------------------------
-    def finish_init(self):
+    def finish_init(self, force=False):
 
-        if getattr(self, 'intialized', False):
+        if not force and getattr(self, 'intialized', False):
             return
 
         self.valid = False
@@ -243,6 +244,8 @@ class Config(Base):
                 description=description,
             )
 
+        cfg.finish_init(force=True)
+
         return cfg
 
     # -----------------------------------------------------
@@ -297,47 +300,65 @@ class Config(Base):
 
     # -----------------------------------------------------
     @classmethod
-    def set(cls, cfg_name, value, description=None):
+    def update(cls, cfg_name, updates):
 
         if cfg_name not in CONFIG:
             raise ConfigNotFoundError(cfg_name)
 
+        if not isinstance(updates, dict):
+            raise TypeError("Parameter 'updates' must be a dict.")
+
+        cur_cfg = cls.get(cfg_name)
+        in_db = False
+        if cur_cfg.created:
+            in_db = True
+        params = {}
+
+        if not updates.keys():
+            LOG.debug("Nothing to update ...")
+            return cur_cfg
+
         cfg_type = CONFIG[cfg_name]['type']
 
-        v = str(value)
+        if 'value' in updates:
+            val = cls.cast_to_value(updates['value'], cfg_type)
+            if val != cur_cfg.cfg_value:
+                params['cfg_value'] = val
+        if not in_db:
+            params['description'] = cur_cfg.description
+        if 'description' in updates and cur_cfg.description != updates['description']:
+            params['description'] = updates['description']
 
-        LOG.info("Setting config parameter {p!r} to {v!r} ...".format(
-            p=cfg_name, v=value))
+        if not params.keys():
+            LOG.debug("Nothing to update ...")
+            return cur_cfg
 
-        db_session = cls.__session__
-        params = {
-            'cfg_name': cfg_name,
-            'cfg_type': cfg_type,
-            'cfg_value': v
-        }
-        if description is not None:
-            params['description'] = str(description)
+        params['cfg_type'] = cfg_type
+        params['cfg_name'] = cfg_name
 
-        LOG.debug("Adding key: {}".format(pp(params)))
+        LOG.debug("Trying to add configuration: {}".format(pp(params)))
         cfg = cls(**params)
+        db_session = cls.__session__
+        if not db_session.is_active:
+            db_session.begin()
 
         try:
-            db_session.add(cls)
+            db_session.add(cfg)
             db_session.commit()
-        except IntegrityError as e:
-            updates = {
-                'cfg_value': v,
-                'modified': text('CURRENT_TIMESTAMP'),
-            }
-            if description is not None:
-                updates['description'] = str(description)
+        except (IntegrityError, FlushError) as e:
+            db_session.rollback()
+            if not db_session.is_active:
+                db_session.begin()
+            params['modified'] = text('CURRENT_TIMESTAMP')
+            del params['cfg_name']
             q = db_session.query(cls).filter(
                 cls.cfg_name == cfg_name)
-            LOG.debug("Update query:\n{}".format(q))
-            q.update(updates, synchronize_session=False)
+            LOG.debug("Updating configuration with: {}".format(pp(params)))
+            q.update(params, synchronize_session=False)
             db_session.commit()
 
-        return v
+        cfg = cls.get(cfg_name)
+        return cfg
 
     # -----------------------------------------------------
     @classmethod
