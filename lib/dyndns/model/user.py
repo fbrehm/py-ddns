@@ -107,7 +107,7 @@ class User(Base):
 
     # -----------------------------------------------------
     @classmethod
-    def all_users(cls, enabled=None, admin=None):
+    def all_users(cls, enabled=None, is_admin=None):
 
         keys = []
 
@@ -121,18 +121,47 @@ class User(Base):
             else:
                 filters['disabled'] = text('True')
 
-        if admin is not None:
-            if bool(enabled):
+        if is_admin is not None:
+            if bool(is_admin):
                 filters['is_admin'] = text('True')
             else:
                 filters['is_admin'] = text('False')
 
         q = cls.query.order_by(User.user_name)
         if filters:
-            q = cls.query.filter(**filters).order_by(User.user_name)
+            q = cls.query.filter_by(**filters).order_by(User.user_name)
         LOG.debug("SQL statement: {}".format(q))
 
         return q.all()
+
+    # -----------------------------------------------------
+    @classmethod
+    def total_count(cls, enabled=None, is_admin=None):
+
+        keys = []
+
+        LOG.debug("Getting total count of all users ...")
+
+        filters = {}
+
+        if enabled is not None:
+            if bool(enabled):
+                filters['disabled'] = text('False')
+            else:
+                filters['disabled'] = text('True')
+
+        if is_admin is not None:
+            if bool(is_admin):
+                filters['is_admin'] = text('True')
+            else:
+                filters['is_admin'] = text('False')
+
+        q = cls.query
+        if filters:
+            q = cls.query.filter_by(**filters)
+        LOG.debug("SQL statement: {}".format(q))
+
+        return q.count()
 
     # -----------------------------------------------------
     @classmethod

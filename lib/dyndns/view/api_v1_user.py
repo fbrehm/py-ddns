@@ -249,6 +249,7 @@ def api_all_users():
         # Forbidden, if not an administrator
         abort(403)
 
+    total_count = User.total_count()
     users = User.all_users()
     url_base = url_for('.index', _external=True)
     url_base += 'api/v1/user/'
@@ -256,7 +257,7 @@ def api_all_users():
     info = {
         'status': 'OK',
         'users': [],
-        'count': len(users)
+        'total_count': total_count,
     }
 
     for user in users:
@@ -264,6 +265,149 @@ def api_all_users():
         u['passwd'] = user.passwd[0:3] + ' ********'
         u['url'] = url_base + str(user.user_id)
         info['users'].append(u)
+
+    return gen_response(info)
+
+#------------------------------------------------------------------------------
+@api.route('/api/v1/users/count')
+@requires_auth
+def api_count_users():
+    ctx = stack.top
+    if not ctx.cur_user.is_admin:
+        # Forbidden, if not an administrator
+        abort(403)
+
+    total_count = User.total_count()
+
+    info = {
+        'status': 'OK',
+        'total_count': total_count,
+    }
+
+    return gen_response(info)
+
+
+#------------------------------------------------------------------------------
+@api.route('/api/v1/users/admins')
+@requires_auth
+def api_all_admin_users():
+    ctx = stack.top
+    if not ctx.cur_user.is_admin:
+        # Forbidden, if not an administrator
+        abort(403)
+
+    total_count = User.total_count(is_admin=True)
+    users = User.all_users(is_admin=True)
+    url_base = url_for('.index', _external=True)
+    url_base += 'api/v1/user/'
+
+    info = {
+        'status': 'OK',
+        'users': [],
+        'total_count': total_count,
+    }
+
+    for user in users:
+        u = user.to_namespace().__dict__
+        u['passwd'] = user.passwd[0:3] + ' ********'
+        u['url'] = url_base + str(user.user_id)
+        info['users'].append(u)
+
+    return gen_response(info)
+
+
+#------------------------------------------------------------------------------
+@api.route('/api/v1/users/enabled')
+@requires_auth
+def api_all_enabled_users():
+    ctx = stack.top
+    if not ctx.cur_user.is_admin:
+        # Forbidden, if not an administrator
+        abort(403)
+
+    total_count = User.total_count(enabled=True)
+    users = User.all_users(enabled=True)
+    url_base = url_for('.index', _external=True)
+    url_base += 'api/v1/user/'
+
+    info = {
+        'status': 'OK',
+        'users': [],
+        'total_count': total_count,
+    }
+
+    for user in users:
+        u = user.to_namespace().__dict__
+        u['passwd'] = user.passwd[0:3] + ' ********'
+        u['url'] = url_base + str(user.user_id)
+        info['users'].append(u)
+
+    return gen_response(info)
+
+
+#------------------------------------------------------------------------------
+@api.route('/api/v1/users/enabled/count')
+@requires_auth
+def api_count_enabled_users():
+    ctx = stack.top
+    if not ctx.cur_user.is_admin:
+        # Forbidden, if not an administrator
+        abort(403)
+
+    total_count = User.total_count(enabled=True)
+
+    info = {
+        'status': 'OK',
+        'total_count': total_count,
+    }
+
+    return gen_response(info)
+
+
+#------------------------------------------------------------------------------
+@api.route('/api/v1/users/disabled')
+@requires_auth
+def api_all_disabled_users():
+    ctx = stack.top
+    if not ctx.cur_user.is_admin:
+        # Forbidden, if not an administrator
+        abort(403)
+
+    total_count = User.total_count(enabled=False)
+    users = User.all_users(enabled=False)
+    url_base = url_for('.index', _external=True)
+    url_base += 'api/v1/user/'
+
+    info = {
+        'status': 'OK',
+        'users': [],
+        'total_count': total_count,
+    }
+
+    for user in users:
+        u = user.to_namespace().__dict__
+        u['passwd'] = user.passwd[0:3] + ' ********'
+        u['url'] = url_base + str(user.user_id)
+        info['users'].append(u)
+
+    return gen_response(info)
+
+
+#------------------------------------------------------------------------------
+@api.route('/api/v1/users/disabled/count')
+@requires_auth
+def api_count_disabled_users():
+    ctx = stack.top
+    if not ctx.cur_user.is_admin:
+        # Forbidden, if not an administrator
+        abort(403)
+
+    total_count = User.total_count(enabled=False)
+
+    info = {
+        'status': 'OK',
+        'total_count': total_count,
+    }
 
     return gen_response(info)
 
