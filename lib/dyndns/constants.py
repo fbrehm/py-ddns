@@ -25,6 +25,9 @@ GLOBAL_CONFIG_FILE = os.path.join(GLOBAL_CONFIG_DIR, 'dyndns.json')
 GLOBAL_LOGGING_CONFIG = os.path.join(GLOBAL_CONFIG_DIR, "logging.json")
 
 CONFIG = {
+    'default_user_max_hosts': {
+        'type': 'int', 'default': 3,
+        'description': 'Default value for maximal hosts for users.'},
     'passwd_restrict_min_len': {'type': 'int', 'default': 8},
     'passwd_restrict_small_chars_required': {'type': 'bool', 'default': True},
     'passwd_restrict_capitals_required': {'type': 'bool', 'default': True},

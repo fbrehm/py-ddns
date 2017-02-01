@@ -379,6 +379,8 @@ class Config(Base):
             return to_bool(value)
 
         if cfg_type == 'int':
+            if isinstance(value, int):
+                return value
             base = 10
             match = cls.hex_re.search(value)
             if match:
@@ -389,34 +391,55 @@ class Config(Base):
             return int(value)
 
         if cfg_type == 'float':
+            if isinstance(value, float):
+                return value
             return float(value)
 
         if cfg_type == 'uuid':
+            if isinstance(value, uuid.UUID):
+                return value
             return uuid.UUID(value)
 
         # Must be in the format '%Y-%m-%d'
         if cfg_type == 'date':
-            d = datetime.datetime.strptime(value.strip(), '%Y-%m-%d').date()
+            if isinstance(value, datetime.date):
+                d = value
+            elif isinstance(value, datetime.datetime):
+                d = value.date()
+            else:
+                d = datetime.datetime.strptime(value.strip(), '%Y-%m-%d').date()
             if for_json:
                 return d.strftime('%Y-%m-%d')
             else:
                 return d
 
         if cfg_type == 'time':
-            d = datetime.datetime.strptime(value.strip(), '%H:%M:%S').time()
+            if isinstance(value, datetime.time):
+                d = value
+            elif isinstance(value, datetime.datetime):
+                d = value.time()
+            else:
+                d = datetime.datetime.strptime(value.strip(), '%H:%M:%S').time()
             if for_json:
                 return d.strftime('%H:%M:%S')
             else:
                 return d
 
         if cfg_type == 'time_tz':
-            d = datetime.datetime.strptime(value.strip(), '%H:%M:%S%z').time()
+            if isinstance(value, datetime.time):
+                d = value
+            elif isinstance(value, datetime.datetime):
+                d = value.time()
+            else:
+                d = datetime.datetime.strptime(value.strip(), '%H:%M:%S%z').time()
             if for_json:
                 return d.strftime('%H:%M:%S%z')
             else:
                 return d
 
         if cfg_type == 'timestamp':
+            if isinstance(value, datetime.datetime):
+                return value
             match = cls.datetime_re.search(value)
             if match:
                 p_str = match.group(1) + ' ' + match.group(2)
@@ -428,6 +451,8 @@ class Config(Base):
             raise ValueError("Invalid timestamp value {!r} found.".format(value))
 
         if cfg_type == 'timestamp_tz':
+            if isinstance(value, datetime.datetime):
+                return value
             match = cls.datetime_re.search(value)
             if match:
                 p_str = match.group(1) + ' ' + match.group(2)
@@ -443,6 +468,8 @@ class Config(Base):
             raise ValueError("Invalid timestamp value {!r} found.".format(value))
 
         if cfg_type == 'time_diff':
+            if isinstance(value, datetime.timedelta):
+                return value
             days = 0
             secs = 0
             match = cls.td_re.search(value)
