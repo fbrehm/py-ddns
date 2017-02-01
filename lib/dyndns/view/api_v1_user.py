@@ -38,6 +38,8 @@ from ..tools import pp, to_bool
 from ..model.user import User
 from ..model.config import Config
 
+from ..errors import UsernameExistsError
+
 from . import api
 from . import requires_auth
 from . import requires_auth_set_passwd
@@ -144,6 +146,12 @@ def update_user(user_id, user_data, ctx):
     LOG.debug("Got data of user {i!r} given:\n{d}".format(
         i=str(user_id), d=pp(user_data)))
 
+    if 'user_name' in user_data:
+        if empty_re.search(user_data['user_name']):
+            errors.append("New username is empty.")
+        else:
+            updates['user_name'] = user_data['user_name']
+
     if 'password' in user_data:
 
         new_pwd = user_data['password']
@@ -203,6 +211,18 @@ def update_user(user_id, user_data, ctx):
         else:
             updates['email'] = user_data['email']
 
+    if 'max_hosts' in user_data:
+        updates['max_hosts'] = user_data['max_hosts']
+
+    if 'is_admin' in user_data:
+        updates['is_admin'] = user_data['is_admin']
+
+    if 'disabled' in user_data:
+        updates['disabled'] = user_data['disabled']
+
+    if 'description' in user_data:
+        updates['description'] = user_data['description']
+
     if errors:
         info = {
             'status': 400,
@@ -222,9 +242,9 @@ def update_user(user_id, user_data, ctx):
         return gen_response(info)
 
     info = User.update_user(user_id, updates)
-    if info['status'] != 'OK':
+    if info['status'] != 'OK' and info['status'] != 400:
         info['response'] = 'Could not change data of user {!r}.'.format(user_id)
-    else:
+    elif info['status'] == 'OK':
         info['response'] = "Successful changed data for user {!r}.".format(user_id)
     url = url_for('.index', _external=True) + 'api/v1/user/' + str(user_id)
     if 'user' in info:

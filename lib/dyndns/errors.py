@@ -27,6 +27,19 @@ class ConfigNotFoundError(DynDnsError):
         return "The configuration parameter {!r} could not be found.".format(self.cfg_name)
 
 
+#------------------------------------------------------------------------------
+class UsernameExistsError(DynDnsError):
+    '''The given username already exists with another user Id.'''
+
+    # -------------------------------------------------------------------------
+    def __init__(self, user_name):
+        self.user_name = user_name
+
+    # -------------------------------------------------------------------------
+    def __str__(self):
+        return "The user name {!r} already exists.".format(self.user_name)
+
+
 
 #==============================================================================
 

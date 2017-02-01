@@ -22,13 +22,15 @@ except ImportError:
 from sqlalchemy import text
 from sqlalchemy import Column, Integer, String, Text, DateTime
 from sqlalchemy.dialects.postgresql import *
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError
+from sqlalchemy.orm.exc import FlushError
 
 
 # Own modules
 from . import Base
 from ..namespace import Namespace
 from ..tools import pp
+from ..errors import UsernameExistsError
 
 LOG = logging.getLogger(__name__)
 
@@ -217,14 +219,24 @@ class User(Base):
 
             except SQLAlchemyError as e:
                 db_session.rollback()
-                info = {
-                    'status': 500,
-                    'response': 'Could not change data of user {!r}.'.format(
-                        str(user_id)),
-                    'errors': [str(e)],
-                }
-                LOG.error("{c} updating data of user {i}: {e}\nUpdate data:\n{u}".format(
-                    c=e.__class__.__name__, i=user_id, e=e, u=pp(updates)))
+                if 'user_name' in updates and e.__class__.__name__ == 'IntegrityError':
+                    msg = 'Could not change data of user {i!r} - username {n!r} already exists.'.format(
+                        i=str(user_id), n=updates['user_name'])
+                    info = {
+                        'status': 400,
+                        'response': msg,
+                    }
+                    LOG.debug("{c} updating data of user {i}: {e}\nUpdate data:\n{u}".format(
+                        c=e.__class__.__name__, i=user_id, e=e, u=pp(updates)))
+                else:
+                    msg = 'Could not change data of user {!r}.'.format(str(user_id))
+                    info = {
+                        'status': 500,
+                        'response': msg,
+                        'errors': [str(e)],
+                    }
+                    LOG.error("{c} updating data of user {i}: {e}\nUpdate data:\n{u}".format(
+                        c=e.__class__.__name__, i=user_id, e=e, u=pp(updates)))
                 return info
 
         user = cls.get_user(user_id)
