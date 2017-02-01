@@ -33,7 +33,7 @@ from sqlalchemy.exc import SQLAlchemyError
 # Own modules
 from ..constants import CONFIG
 
-from ..tools import pp
+from ..tools import pp, to_bool
 
 from ..model.user import User
 from ..model.config import Config
@@ -226,6 +226,15 @@ def update_user(user_id, user_data, ctx):
         info['response'] = 'Could not change data of user {!r}.'.format(user_id)
     else:
         info['response'] = "Successful changed data for user {!r}.".format(user_id)
+    url = url_for('.index', _external=True) + 'api/v1/user/' + str(user_id)
+    if 'user' in info:
+        info['user']['url']= url
+        if 'created' in info['user'] and info['user']['created']:
+            info['user']['created'] = info['user']['created'].isoformat(' ')
+        if 'modified' in info['user'] and info['user']['modified']:
+            info['user']['modified'] = info['user']['modified'].isoformat(' ')
+    else:
+        info['url'] = url
 
     return gen_response(info)
 
@@ -261,7 +270,7 @@ def api_all_users():
 
 #------------------------------------------------------------------------------
 @api.route('/api/v1/user/<user_id>')
-@api.route('/api/v1/user/id/<user_id>')
+@api.route('/api/v1/users/id/<user_id>')
 @requires_auth
 def api_user_from_id(user_id):
     ctx = stack.top
@@ -302,7 +311,90 @@ def api_user_from_id(user_id):
 
 
 #------------------------------------------------------------------------------
-@api.route('/api/v1/user/name/<user_id>')
+@api.route('/api/v1/user/<user_id>', methods=['PATCH', 'PUT'])
+@requires_auth
+def api_update_user(user_id):
+    ctx = stack.top
+    if not ctx.cur_user.is_admin:
+        # Forbidden, if not an administrator
+        abort(403)
+
+    user = User.get_user(user_id)
+    if not user:
+        info = {
+            'status': 'Not found',
+            'response': 'User {!r} not found.'.format(user_id)
+        }
+        return gen_response(info)
+
+    default_max_hosts = Config.get('default_user_max_hosts').value
+
+    url_base = url_for('.index', _external=True)
+    url_base += 'api/v1/user/'
+
+    user_data = {}
+    errors = []
+    if request.method == 'PUT':
+        if not 'user_name' in request.values:
+            errors.append("No new username given for user.")
+        if not 'password' in request.values:
+            errors.append("No new password given for user.")
+        if not 'full_name' in request.values:
+            errors.append("No new full user name given for user.")
+        if not 'email' in request.values:
+            errors.append("No new email address given for user.")
+        user_data['max_hosts'] = default_max_hosts
+        user_data['is_admin'] = False
+        user_data['disabled'] = False
+        user_data['description'] = None
+
+
+    if 'user_name' in request.values:
+        user_data['user_name'] = request.values['user_name']
+    if 'password' in request.values:
+        user_data['password'] = request.values['password']
+    if 'full_name' in request.values:
+        user_data['full_name'] = request.values['full_name']
+    if 'email' in request.values:
+        user_data['email'] = request.values['email']
+    if 'max_hosts' in request.values:
+        mh = request.values['max_hosts']
+        if empty_re.search(mh):
+            user_data['max_hosts'] = None
+        else:
+            try:
+                mh = int(mh)
+            except ValueError as e:
+                errors.append("Invalid value {v!r} for max_hosts: {e}".format(
+                    v=request.values['max_hosts'], e=e))
+            else:
+                if mh < 0:
+                    errors.append("Invalid value {v!r} for max_hosts: {e}".format(
+                        v=request.values['max_hosts'],
+                        e="No negative values allowed."))
+                else:
+                    user_data['max_hosts'] = mh
+    if 'is_admin' in request.values:
+        user_data['is_admin'] = to_bool(request.values['is_admin'])
+    if 'disabled' in request.values:
+        user_data['disabled'] = to_bool(request.values['disabled'])
+    if 'description' in request.values:
+        user_data['description'] = request.values['description'].strip()
+
+    if errors:
+        info = {
+            'status': 400,
+            'response': "Error updating user {}.".format(user_id),
+            'errors': errors,
+            'url': url_base + str(user_id),
+        }
+        return gen_response(info)
+
+    return update_user(user_id, user_data, ctx)
+
+
+#------------------------------------------------------------------------------
+@api.route('/api/v1/users/name/<user_id>')
 @requires_auth
 def api_user_from_name(user_id):
     ctx = stack.top
