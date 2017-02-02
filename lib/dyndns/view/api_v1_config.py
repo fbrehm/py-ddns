@@ -194,6 +194,16 @@ def set_config(cfg_name):
             c=cfg_name, e=e))
         return gen_response(info)
 
+    if cfg_name == 'debug':
+        sql_logger = logging.getLogger('sqlalchemy.engine')
+        lvl = 'WARN'
+        if cfg.value:
+            sql_logger.setLevel(logging.INFO)
+            lvl = 'INFO'
+        else:
+            sql_logger.setLevel(logging.WARN)
+        LOG.info("Setting SQL logging level to: {}".format(lvl))
+
     in_db = False
     c_time = None
     if cfg.created:

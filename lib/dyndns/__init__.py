@@ -45,7 +45,7 @@ LOG = logging.getLogger("dyndns")
 __author__ = 'Frank Brehm <frank@brehm-online.com>'
 __copyright__ = '(C) 2017 by Frank Brehm, Berlin'
 __contact__ = 'frank.brehm@profitbricks.com'
-__version__ = '0.6.1'
+__version__ = '0.6.2'
 __license__ = 'LGPLv3+'
 
 
@@ -177,17 +177,17 @@ def create_app():
     with app.app_context():
         create_session()
 
-    root_logger = logging.getLogger()
+    sql_logger = logging.getLogger('sqlalchemy.engine')
     debug_cfg = Config.get('debug')
     LOG.debug("Got a {c} object for 'debug': {o!r}.".format(
         c=debug_cfg.__class__.__name__, o=debug_cfg))
-    lvl = 'INFO'
+    lvl = 'WARN'
     if debug_cfg.value:
-        root_logger.setLevel(logging.DEBUG)
-        lvl = 'DEBUG'
+        sql_logger.setLevel(logging.INFO)
+        lvl = 'INFO'
     else:
-        root_logger.setLevel(logging.INFO)
-    LOG.info("Global logging level: {}".format(lvl))
+        sql_logger.setLevel(logging.WARN)
+    LOG.info("SQL logging level: {}".format(lvl))
     LOG.info("Flask application created")
 
     return app

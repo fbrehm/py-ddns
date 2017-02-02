@@ -132,7 +132,6 @@ class User(Base):
         q = cls.query.order_by(User.user_name)
         if filters:
             q = cls.query.filter_by(**filters).order_by(User.user_name)
-        LOG.debug("SQL statement: {}".format(q))
 
         return q.all()
 
@@ -161,7 +160,6 @@ class User(Base):
         q = cls.query
         if filters:
             q = cls.query.filter_by(**filters)
-        LOG.debug("SQL statement: {}".format(q))
 
         return q.count()
 
@@ -189,7 +187,6 @@ class User(Base):
             LOG.debug("Searching user by user_name {!r} ...".format(str(user_ident)))
             user = cls.query.filter(cls.user_name == str(user_ident)).first()
             q = cls.query.filter(cls.user_name == str(user_ident))
-        LOG.debug("SQL statement: {}".format(q))
         user = q.first()
 
         return user
@@ -213,7 +210,6 @@ class User(Base):
             try:
                 q = db_session.query(cls).filter(
                     cls.user_id == uid)
-                LOG.debug("Update query:\n{}".format(q))
                 q.update(updates, synchronize_session=False)
                 db_session.commit()
 

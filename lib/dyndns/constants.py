@@ -33,7 +33,9 @@ CONFIG = {
     'passwd_restrict_capitals_required': {'type': 'bool', 'default': True},
     'passwd_restrict_digits_required': {'type': 'bool', 'default': True},
     'passwd_restrict_special_chars_required': {'type': 'bool', 'default': True},
-    'debug': {'type': 'bool', 'default': False},
+    'debug': {
+        'type': 'bool', 'default': False,
+        'description': 'If True, then enabling logging of all SQL statements.'},
     'model_version': {'type': 'version', 'default': '0.2.1'},
     'zzz_blub': {'type': 'str', 'default': 'Blah'},
 }

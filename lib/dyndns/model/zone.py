@@ -178,7 +178,6 @@ class ZoneView(Base):
         q = cls.query.order_by(cls.zone_name)
         if filters:
             q = cls.query.filter(**filters).order_by(cls.zone_name)
-        LOG.debug("SQL statement: {}".format(q))
 
         return q.all()
 

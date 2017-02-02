@@ -102,7 +102,6 @@ class TsigKey(Base):
 
         LOG.debug("Searching TSIG key by key_id {!r} ...".format(key_id))
         q = cls.query.filter(cls.key_id == str(key_id))
-        LOG.debug("SQL statement: {}".format(q))
 
         return q.first()
 
@@ -113,7 +112,6 @@ class TsigKey(Base):
 
         LOG.debug("Searching TSIG key by key name {!r} ...".format(str(key_name)))
         q = cls.query.filter(cls.key_name == key_name)
-        LOG.debug("SQL statement: {}".format(q))
 
         return q.first()
 

@@ -173,7 +173,6 @@ class Config(Base):
         LOG.debug("Getting all config parameters ...")
 
         q = cls.query.order_by(Config.cfg_name)
-        LOG.debug("SQL statement: {}".format(q))
 
         return q.all()
 
@@ -216,7 +215,6 @@ class Config(Base):
         LOG.debug("Searching configuration {!r} ...".format(cfg_name))
 
         q = cls.query.filter(cls.cfg_name == str(cfg_name))
-        LOG.debug("SQL statement: {}".format(q))
 
         configs = q.all()
         if not configs:
@@ -265,7 +263,6 @@ class Config(Base):
             cfg_keys.append('passwd_restrict_' + key)
 
         q = cls.query.filter(cls.cfg_name.in_(cfg_keys))
-        LOG.debug("SQL statement: {}".format(q))
 
         for cfg in q.all():
             val = cfg.cfg_value
