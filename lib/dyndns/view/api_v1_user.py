@@ -475,6 +475,169 @@ def api_user_from_id(user_id):
 
 
 #------------------------------------------------------------------------------
+def check_password(new_pwd, old_pwd=None):
+    """
+    Checking the given password for restrictions.
+
+    @param new_pwd: the new (unencrypted) passsword to check.
+    @type new_pwd: str
+    @param old_pwd: the old (encrypted) password, or None, if it is a ne user
+    @type old_pwd: str or None
+
+    @return: a tuple of two values:
+                * an integer:
+                    * 1, if password is ok
+                    * 0, if password has errors and is invalid
+                    * 2, if password is ok, but equal to the old one
+                * a list of error messages. if the password is valid, then
+                  these are only some informal messages
+
+    """
+
+    errors = []
+    status = 1
+
+    passwd_restrictions = Config.get_password_restrictions()
+    LOG.debug("Checking or password restrictions:\n{}".format(pp(passwd_restrictions)))
+
+    if empty_re.search(new_pwd):
+        errors.append("New password is empty.")
+        return (0, errors)
+
+    if old_pwd:
+        enc_pwd = crypt.crypt(new_pwd, old_pwd)
+        if enc_pwd == old_pwd:
+            errors.append("New password is matching the old password.")
+            return (2, errors)
+
+    if len(new_pwd) < passwd_restrictions['min_len']:
+        errors.append("New password is too short (min. {} characters).".format(
+            passwd_restrictions['min_len']))
+        status = 0
+
+    if not valid_re.search(new_pwd):
+        errors.append("New password contains invalid characters.")
+        status = 0
+
+    if passwd_restrictions['small_chars_required'] and not small_re.search(new_pwd):
+        errors.append("New password contains no small letters.")
+        status = 0
+
+    if passwd_restrictions['capitals_required'] and not capitals_re.search(new_pwd):
+        errors.append("New password contains no capitals.")
+        status = 0
+
+    if passwd_restrictions['digits_required'] and not digits_re.search(new_pwd):
+        errors.append("New password contains no digits.")
+        status = 0
+
+    if passwd_restrictions['special_chars_required'] and not specials_re.search(new_pwd):
+        errors.append("New password contains no special characters.")
+        status = 0
+
+    return (status, errors)
+
+
+#------------------------------------------------------------------------------
+@api.route('/api/v1/user', methods=['POST'])
+@requires_auth
+def api_add_user():
+    ctx = stack.top
+    if not ctx.cur_user.is_admin:
+        # Forbidden, if not an administrator
+        abort(403)
+
+    default_max_hosts = Config.get('default_user_max_hosts').value
+
+    url_base = url_for('.index', _external=True)
+    url_base += 'api/v1/user'
+
+    user_data = {}
+    errors = []
+
+    if 'user_name' in request.values:
+        user_data['user_name'] = request.values['user_name']
+    else:
+        errors.append("No new username given for user.")
+
+    if 'password' in request.values:
+        (pwd_status, pwd_errors) = check_password(request.values['password'])
+        if not pwd_status:
+            errors += pwd_errors
+        else:
+            if pwd_errors:
+                LOG.warn("Got some password check warnings:\n{}".format(pp(pwd_errors)))
+            salt = crypt.mksalt(crypt.METHOD_SHA512)
+            enc_pwd = crypt.crypt(new_pwd, salt)
+            user_data['passwd'] = enc_pwd
+    else:
+        errors.append("No new password given for user.")
+
+    if 'full_name' in request.values:
+        if empty_re.search(request.values['full_name']):
+            errors.append("New full name is empty.")
+        else:
+            user_data['full_name'] = request.values['full_name'].strip()
+    else:
+        errors.append("No new full user name given for user.")
+
+    if 'email' in request.values:
+        if empty_re.search(request.values['email']):
+            errors.append("New email address is empty.")
+        elif not email_re.search(request.values['email']):
+            errors.append("Wrong E-Mail address {!r}.".format(
+                request.values['email']))
+        else:
+            user_data['email'] = request.values['email'].strip()
+    else:
+        errors.append("No new email address given for user.")
+
+    user_data['max_hosts'] = default_max_hosts
+    if 'max_hosts' in request.values:
+        mh = request.values['max_hosts']
+        if empty_re.search(mh):
+            user_data['max_hosts'] = None
+        else:
+            try:
+                mh = int(mh)
+            except ValueError as e:
+                errors.append("Invalid value {v!r} for max_hosts: {e}".format(
+                    v=request.values['max_hosts'], e=e))
+            else:
+                if mh < 0:
+                    errors.append("Invalid value {v!r} for max_hosts: {e}".format(
+                        v=request.values['max_hosts'],
+                        e="No negative values allowed."))
+                else:
+                    user_data['max_hosts'] = mh
+
+    user_data['is_admin'] = False
+    if 'is_admin' in request.values:
+        user_data['is_admin'] = to_bool(request.values['is_admin'])
+
+    user_data['disabled'] = False
+    if 'disabled' in request.values:
+        user_data['disabled'] = to_bool(request.values['disabled'])
+
+    user_data['description'] = None
+    if 'description' in request.values:
+        user_data['description'] = request.values['description'].strip()
+
+    if errors:
+        info = {
+            'status': 400,
+            'response': "Error on new user."
+            'errors': errors,
+            'url': url_base
+        }
+        return gen_response(info)
+
+
+
+
+
+
+#------------------------------------------------------------------------------
 @api.route('/api/v1/user/<user_id>', methods=['PATCH', 'PUT'])
 @requires_auth
 def api_update_user(user_id):

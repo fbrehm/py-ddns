@@ -245,6 +245,64 @@ class User(Base):
         LOG.debug("Found updated user:\n{}".format(pp(info)))
         return info
 
+    # -----------------------------------------------------
+    @classmethod
+    def add_user(cls, user_data):
+
+        if not isinstance(user_data, dict):
+            raise TypeError("Parameter 'user_data' must be a dict.")
+
+        db_session = cls.__session__
+        if 'user_id' in user_data:
+            del user_data['user_id']
+
+        errors = []
+        # Check for necessary fields
+        for field in ('user_name', 'password', 'full_name', 'email'):
+            if not field in user_data:
+                errors.append("Field {!r} not given.".format(field))
+
+        response = None
+        status = 'OK'
+        info = {}
+        name = user_data['user_name']
+
+        if errors:
+            status = 400
+            response = 'Could not add user {}.'.format(pp(user_data))
+        else:
+            user = cls(**user_data)
+
+            try:
+                db_session.add(user)
+                db_session.commit()
+            except SQLAlchemyError as e:
+                db_session.rollback()
+                status = 500
+                if e.__class__.__name__ == 'IntegrityError':
+                    response = 'Could not add user with name {!r}.'.format(name)
+                    errors.append('There is already existing a user with this name.')
+                else:
+                    response = 'Could not add user {}.'.format(pp(user_data))
+                    errors.append(str(e))
+
+                LOG.error("{c} adding user {u}: {e}".format(
+                    c=e.__class__.__name__, u=pp(user_data), e=e))
+
+            else:
+                new_user = cls.get_user(name)
+                info['user'] = new_user.to_namespace().__dict__
+                response = "Successful added user {u!r} - {i}".format(
+                    u=name, i=new_user.user_id)
+
+        info['status'] = status
+        info['response'] = response
+        if errors:
+            info['errors'] = errors
+
+        return info
+
+
 #==============================================================================
 
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4
