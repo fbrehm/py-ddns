@@ -107,146 +107,33 @@ def api_cur_user_get_passwd():
 def api_cur_user_patch():
     ctx = stack.top
 
-    user_data = {}
-    if 'password' in request.form:
-        user_data['password'] = request.form['password']
-    if 'full_name' in request.form:
-        user_data['full_name'] = request.form['full_name']
-    if 'email' in request.form:
-        user_data['email'] = request.form['email']
+    url_base = url_for('.index', _external=True)
+    url = url_base + 'api/v1/cur_user'
+    user_id = ctx.cur_user.user_id
 
-    return update_user(ctx.cur_user.user_id, user_data, ctx)
+    (ok, user_data, errors) = check_userdata(complete=False, restricted=True)
 
-
-#------------------------------------------------------------------------------
-@api.route('/api/v1/cur_user/password', methods=['PATCH'])
-@requires_auth
-def api_cur_user_set_pwd():
-    ctx = stack.top
-
-    if 'new_password' not in request.form:
+    if not ok or errors:
         info = {
             'status': 400,
-            'response': "No password given (form field 'new_password').",
-        }
-        return gen_response(info)
-
-    user_data = {'password': request.form['new_password']}
-    return update_user(ctx.cur_user.user_id, user_data, ctx)
-
-
-#------------------------------------------------------------------------------
-def update_user(user_id, user_data, ctx):
-
-    errors = []
-    updates = {}
-
-    passwd_restrictions = Config.get_password_restrictions()
-
-    LOG.debug("Got data of user {i!r} given:\n{d}".format(
-        i=str(user_id), d=pp(user_data)))
-
-    if 'user_name' in user_data:
-        if empty_re.search(user_data['user_name']):
-            errors.append("New username is empty.")
-        else:
-            updates['user_name'] = user_data['user_name']
-
-    if 'password' in user_data:
-
-        new_pwd = user_data['password']
-        passwd_wrong = False
-        while True:
-
-            if empty_re.search(new_pwd):
-                errors.append("New password is empty.")
-                break
-
-            enc_pwd = crypt.crypt(new_pwd, ctx.cur_user.passwd)
-            if enc_pwd == ctx.cur_user.passwd:
-                LOG.debug("New password is matching the old password.")
-                break
-
-            if len(new_pwd) < passwd_restrictions['min_len']:
-                errors.append("New password is too short (min. {} characters).".format(
-                    passwd_restrictions['min_len']))
-                passwd_wrong = True
-            if not valid_re.search(new_pwd):
-                errors.append("New password contains invalid characters.")
-                passwd_wrong = True
-            if passwd_restrictions['small_chars_required'] and not small_re.search(new_pwd):
-                errors.append("New password contains no small letters.")
-                passwd_wrong = True
-            if passwd_restrictions['capitals_required'] and not capitals_re.search(new_pwd):
-                errors.append("New password contains no capitals.")
-                passwd_wrong = True
-            if passwd_restrictions['digits_required'] and not digits_re.search(new_pwd):
-                errors.append("New password contains no digits.")
-                passwd_wrong = True
-            if passwd_restrictions['special_chars_required'] and not specials_re.search(new_pwd):
-                errors.append("New password contains no special characters.")
-                passwd_wrong = True
-
-            if passwd_wrong:
-                break
-
-            salt = crypt.mksalt(crypt.METHOD_SHA512)
-            enc_pwd = crypt.crypt(new_pwd, salt)
-            updates['passwd'] = enc_pwd
-            LOG.debug("Setting password for user {u!r} to {p!r} ...".format(
-                u=ctx.cur_user.user_name, p=enc_pwd))
-            break
-
-    if 'full_name' in user_data:
-        if empty_re.search(user_data['full_name']):
-            errors.append("New full name is empty.")
-        else:
-            updates['full_name'] = user_data['full_name']
-
-    if 'email' in user_data:
-        if empty_re.search(user_data['email']):
-            errors.append("New email address is empty.")
-        elif not email_re.search(user_data['email']):
-            errors.append("Wrong E-Mail address {!r}.".format(user_data['email']))
-        else:
-            updates['email'] = user_data['email']
-
-    if 'max_hosts' in user_data:
-        updates['max_hosts'] = user_data['max_hosts']
-
-    if 'is_admin' in user_data:
-        updates['is_admin'] = user_data['is_admin']
-
-    if 'disabled' in user_data:
-        updates['disabled'] = user_data['disabled']
-
-    if 'description' in user_data:
-        updates['description'] = user_data['description']
-
-    if errors:
-        info = {
-            'status': 400,
-            'response': "Could not update user data.",
+            'response': "Error updating current user.",
             'errors': errors,
+            'url': url,
         }
-        LOG.warn("Could not update data for user {i!r}:\n{e}".format(
-            i=str(user_id), e=pp(errors)))
         return gen_response(info)
 
-    if not updates.keys():
+    if not user_data.keys():
         info = {
             'status': 406,
-            'response': "No changes for user data found.",
+            'response': "No changes for current user found.",
+            'url': url,
         }
         LOG.warn("No changes for user {!r} found.".format(str(user_id)))
         return gen_response(info)
 
-    info = User.update_user(user_id, updates)
-    if info['status'] != 'OK' and info['status'] != 400:
-        info['response'] = 'Could not change data of user {!r}.'.format(user_id)
-    elif info['status'] == 'OK':
-        info['response'] = "Successful changed data for user {!r}.".format(user_id)
-    url = url_for('.index', _external=True) + 'api/v1/user/' + str(user_id)
+    # The underlying update
+    info = User.update_user(user_id, user_data)
+
     if 'user' in info:
         info['user']['url']= url
         if 'created' in info['user'] and info['user']['created']:
@@ -255,6 +142,71 @@ def update_user(user_id, user_data, ctx):
             info['user']['modified'] = info['user']['modified'].isoformat(' ')
     else:
         info['url'] = url
+
+    return gen_response(info)
+
+#------------------------------------------------------------------------------
+@api.route('/api/v1/cur_user/password', methods=['PATCH'])
+@api.route('/api/v1/cur_user/password/<password>', methods=['PATCH'])
+@requires_auth
+def api_cur_user_set_pwd(password):
+    ctx = stack.top
+
+    url_base = url_for('.index', _external=True)
+    url = url_base + 'api/v1/cur_user/password'
+
+    user_id = ctx.cur_user.user_id
+
+    new_pwd = password
+    if 'password' in request.values:
+        new_pwd = request.values['password']
+    elif 'new_password' in request.values:
+        new_pwd = request.values['new_password']
+
+    if not new_pwd:
+        info = {
+            'status': 400,
+            'response': "No password given.",
+            'url': url,
+        }
+        return gen_response(info)
+
+    user_data = {}
+    errors = []
+
+    (pwd_status, pwd_errors) = check_password(new_pwd)
+    if not pwd_status:
+        errors += pwd_errors
+    else:
+        if pwd_errors:
+            LOG.warn("Got some password check warnings:\n{}".format(pp(pwd_errors)))
+        salt = crypt.mksalt(crypt.METHOD_SHA512)
+        enc_pwd = crypt.crypt(new_pwd, salt)
+        user_data['passwd'] = enc_pwd
+
+    if errors:
+        info = {
+            'status': 400,
+            'response': "Error updating password of current user.",
+            'errors': errors,
+            'url': url,
+        }
+        return gen_response(info)
+
+    # The underlying update
+    info = User.update_user(user_id, user_data)
+
+    if 'user' in info:
+        info['user']['url']= url
+        if 'created' in info['user'] and info['user']['created']:
+            info['user']['created'] = info['user']['created'].isoformat(' ')
+        if 'modified' in info['user'] and info['user']['modified']:
+            info['user']['modified'] = info['user']['modified'].isoformat(' ')
+    else:
+        info['url'] = url
+
+    if info['status'] == 'OK':
+        info['response'] = 'Successful changed password of current user.'
 
     return gen_response(info)
 
@@ -539,27 +491,46 @@ def check_password(new_pwd, old_pwd=None):
 
 
 #------------------------------------------------------------------------------
-@api.route('/api/v1/user', methods=['POST'])
-@requires_auth
-def api_add_user():
-    ctx = stack.top
-    if not ctx.cur_user.is_admin:
-        # Forbidden, if not an administrator
-        abort(403)
+def check_userdata(complete=False, restricted=False):
+    """
+    Checking the validity of given userdata.
+
+    @param complete: Checking for complete user data (for PUT and POST requests)
+    @type complete: bool
+    @param restricted: performing a check of restricted data (for the case,
+                        a user is updating its own data)
+    @type restricted: bool
+
+    @return: a tuple of three values:
+                * a boolean flag, whether the new data are okay
+                * a dict with the new user data, which can be used directly
+                    for adding or updating
+                * a list with all error messages
+
+    """
+
+    ok = True
 
     default_max_hosts = Config.get('default_user_max_hosts').value
-
-    url_base = url_for('.index', _external=True)
-    url_base += 'api/v1/user'
 
     user_data = {}
     errors = []
 
+    valid_fields = (
+        'user_name', 'password', 'full_name', 'email', 'max_hosts',
+        'is_admin', 'disabled', 'description')
+
+    # Check for new username / loginname
     if 'user_name' in request.values:
-        user_data['user_name'] = request.values['user_name']
-    else:
+        new_name = request.values['user_name'].strip()
+        if new_name:
+            user_data['user_name'] = new_name
+        elif complete:
+            errors.append("New username is empty.")
+    elif complete:
         errors.append("No new username given for user.")
 
+    # Check for new password
     if 'password' in request.values:
         (pwd_status, pwd_errors) = check_password(request.values['password'])
         if not pwd_status:
@@ -570,71 +541,129 @@ def api_add_user():
             salt = crypt.mksalt(crypt.METHOD_SHA512)
             enc_pwd = crypt.crypt(new_pwd, salt)
             user_data['passwd'] = enc_pwd
-    else:
+    elif complete:
         errors.append("No new password given for user.")
 
+    # Check for th full user name
     if 'full_name' in request.values:
-        if empty_re.search(request.values['full_name']):
+        if empty_re.search(request.values['full_name']) and complete:
             errors.append("New full name is empty.")
         else:
             user_data['full_name'] = request.values['full_name'].strip()
-    else:
+    elif complete:
         errors.append("No new full user name given for user.")
 
+    # Check for the E-Mail address
     if 'email' in request.values:
-        if empty_re.search(request.values['email']):
+        if empty_re.search(request.values['email']) and complete:
             errors.append("New email address is empty.")
         elif not email_re.search(request.values['email']):
             errors.append("Wrong E-Mail address {!r}.".format(
                 request.values['email']))
         else:
             user_data['email'] = request.values['email'].strip()
-    else:
+    elif complete:
         errors.append("No new email address given for user.")
 
-    user_data['max_hosts'] = default_max_hosts
+    # Checking for the max_hosts value
     if 'max_hosts' in request.values:
-        mh = request.values['max_hosts']
-        if empty_re.search(mh):
-            user_data['max_hosts'] = None
+        if restricted:
+            errors.append("You are not allowed to change the maximum hosts for this user.")
         else:
-            try:
-                mh = int(mh)
-            except ValueError as e:
-                errors.append("Invalid value {v!r} for max_hosts: {e}".format(
-                    v=request.values['max_hosts'], e=e))
+            mh = request.values['max_hosts']
+            if empty_re.search(mh):
+                user_data['max_hosts'] = None
             else:
-                if mh < 0:
+                try:
+                    mh = int(mh)
+                except ValueError as e:
                     errors.append("Invalid value {v!r} for max_hosts: {e}".format(
-                        v=request.values['max_hosts'],
-                        e="No negative values allowed."))
+                        v=request.values['max_hosts'], e=e))
                 else:
-                    user_data['max_hosts'] = mh
+                    if mh < 0:
+                        errors.append("Invalid value {v!r} for max_hosts: {e}".format(
+                            v=request.values['max_hosts'],
+                            e="No negative values allowed."))
+                    else:
+                        user_data['max_hosts'] = mh
+    elif complete:
+        user_data['max_hosts'] = default_max_hosts
 
-    user_data['is_admin'] = False
+    # Checking the administrator flag
     if 'is_admin' in request.values:
-        user_data['is_admin'] = to_bool(request.values['is_admin'])
+        if restricted:
+            errors.append("You are not allowed to change the administrator flag for this user.")
+        else:
+            user_data['is_admin'] = to_bool(request.values['is_admin'])
+    elif complete:
+        user_data['is_admin'] = False
 
-    user_data['disabled'] = False
+    # Checking the disabled flag
     if 'disabled' in request.values:
-        user_data['disabled'] = to_bool(request.values['disabled'])
+        if restricted:
+            errors.append("You are not allowed to change the disabled flag for this user.")
+        else:
+            user_data['disabled'] = to_bool(request.values['disabled'])
+    elif complete:
+        user_data['disabled'] = False
 
-    user_data['description'] = None
+    # Checking the description of the user
     if 'description' in request.values:
-        user_data['description'] = request.values['description'].strip()
+        if restricted:
+            errors.append("You are not allowed to change the description for this user.")
+        else:
+            user_data['description'] = request.values['description'].strip()
+    elif complete:
+        user_data['description'] = None
+
+    for key in request.values.keys():
+        if key in valid_fields:
+            continue
+        vals = request.values.getlist(key)
+        errors.append("Unknown field {f!r} with value {v} given.".format(
+            f=key, v=pp(vals)))
 
     if errors:
+        ok = False
+
+    return (ok, user_data, errors)
+
+#------------------------------------------------------------------------------
+@api.route('/api/v1/user', methods=['POST'])
+@requires_auth
+def api_add_user():
+    ctx = stack.top
+    if not ctx.cur_user.is_admin:
+        # Forbidden, if not an administrator
+        abort(403)
+
+    url_base = url_for('.index', _external=True)
+    url = url_base + 'api/v1/user'
+
+    (ok, user_data, errors) = check_userdata(complete=True)
+
+    if not ok or errors:
         info = {
             'status': 400,
-            'response': "Error on new user."
+            'response': "Error on new user.",
             'errors': errors,
-            'url': url_base
+            'url': url
         }
         return gen_response(info)
 
+    info = User.add_user(user_data)
 
+    if 'user' in info:
+        url += '/' + str(info['user'].user_id)
+        info['user']['url']= url
+        if 'created' in info['user'] and info['user']['created']:
+            info['user']['created'] = info['user']['created'].isoformat(' ')
+        if 'modified' in info['user'] and info['user']['modified']:
+            info['user']['modified'] = info['user']['modified'].isoformat(' ')
+    else:
+        info['url'] = url
 
-
+    return gen_response(info)
 
 
 #------------------------------------------------------------------------------
@@ -656,59 +685,16 @@ def api_update_user(user_id):
 
     default_max_hosts = Config.get('default_user_max_hosts').value
 
+    complete = False
+    if request.method == 'PUT':
+        complete = True
+
     url_base = url_for('.index', _external=True)
     url_base += 'api/v1/user/'
 
-    user_data = {}
-    errors = []
-    if request.method == 'PUT':
-        if not 'user_name' in request.values:
-            errors.append("No new username given for user.")
-        if not 'password' in request.values:
-            errors.append("No new password given for user.")
-        if not 'full_name' in request.values:
-            errors.append("No new full user name given for user.")
-        if not 'email' in request.values:
-            errors.append("No new email address given for user.")
-        user_data['max_hosts'] = default_max_hosts
-        user_data['is_admin'] = False
-        user_data['disabled'] = False
-        user_data['description'] = None
+    (ok, user_data, errors) = check_userdata(complete=complete)
 
-
-    if 'user_name' in request.values:
-        user_data['user_name'] = request.values['user_name']
-    if 'password' in request.values:
-        user_data['password'] = request.values['password']
-    if 'full_name' in request.values:
-        user_data['full_name'] = request.values['full_name']
-    if 'email' in request.values:
-        user_data['email'] = request.values['email']
-    if 'max_hosts' in request.values:
-        mh = request.values['max_hosts']
-        if empty_re.search(mh):
-            user_data['max_hosts'] = None
-        else:
-            try:
-                mh = int(mh)
-            except ValueError as e:
-                errors.append("Invalid value {v!r} for max_hosts: {e}".format(
-                    v=request.values['max_hosts'], e=e))
-            else:
-                if mh < 0:
-                    errors.append("Invalid value {v!r} for max_hosts: {e}".format(
-                        v=request.values['max_hosts'],
-                        e="No negative values allowed."))
-                else:
-                    user_data['max_hosts'] = mh
-    if 'is_admin' in request.values:
-        user_data['is_admin'] = to_bool(request.values['is_admin'])
-    if 'disabled' in request.values:
-        user_data['disabled'] = to_bool(request.values['disabled'])
-    if 'description' in request.values:
-        user_data['description'] = request.values['description'].strip()
-
-    if errors:
+    if not ok or errors:
         info = {
             'status': 400,
             'response': "Error updating user {}.".format(user_id),
@@ -717,7 +703,29 @@ def api_update_user(user_id):
         }
         return gen_response(info)
 
-    return update_user(user_id, user_data, ctx)
+    if not user_data.keys():
+        info = {
+            'status': 406,
+            'response': "No changes for user data found.",
+            'url': url_base + str(user_id),
+        }
+        LOG.warn("No changes for user {!r} found.".format(str(user_id)))
+        return gen_response(info)
+
+    # The underlying update
+    info = User.update_user(user_id, user_data)
+
+    url = url_base + str(user_id)
+    if 'user' in info:
+        info['user']['url']= url
+        if 'created' in info['user'] and info['user']['created']:
+            info['user']['created'] = info['user']['created'].isoformat(' ')
+        if 'modified' in info['user'] and info['user']['modified']:
+            info['user']['modified'] = info['user']['modified'].isoformat(' ')
+    else:
+        info['url'] = url
+
+    return gen_response(info)
 
 
 #------------------------------------------------------------------------------
