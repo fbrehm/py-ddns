@@ -202,6 +202,8 @@ class User(Base):
         if 'user_id' in updates:
             del updates['user_id']
 
+        status = 'OK'
+
         if updates.keys():
             updates['modified'] = text('CURRENT_TIMESTAMP')
             LOG.debug("Updating user with:\n{}".format(pp(updates)))
@@ -225,11 +227,12 @@ class User(Base):
                     LOG.debug("{c} updating data of user {i}: {e}\nUpdate data:\n{u}".format(
                         c=e.__class__.__name__, i=user_id, e=e, u=pp(updates)))
                 else:
-                    msg = 'Could not change data of user {!r}.'.format(str(user_id))
+                    msg = 'Could not change data of user {!r} - internal error.'.format(str(user_id))
+                    updates['modified'] = 'CURRENT_TIMESTAMP'
                     info = {
                         'status': 500,
                         'response': msg,
-                        'errors': [str(e)],
+                        'errors': ["Tried user data to change:\n{}".format(pp(updates))]
                     }
                     LOG.error("{c} updating data of user {i}: {e}\nUpdate data:\n{u}".format(
                         c=e.__class__.__name__, i=user_id, e=e, u=pp(updates)))
@@ -238,7 +241,7 @@ class User(Base):
         user = cls.get_user(user_id)
         info = {
             'status': 'OK',
-            'response': 'Updated user {!r}.'.format(str(user_id)),
+            'response': 'Successful changed data for user {!r}.'.format(str(user_id)),
             'user': None,
         }
         info['user'] = user.to_namespace().__dict__
@@ -279,12 +282,12 @@ class User(Base):
             except SQLAlchemyError as e:
                 db_session.rollback()
                 status = 500
+                response = 'Could not add user with name {!r}.'.format(name)
                 if e.__class__.__name__ == 'IntegrityError':
-                    response = 'Could not add user with name {!r}.'.format(name)
+                    status = 400
                     errors.append('There is already existing a user with this name.')
                 else:
-                    response = 'Could not add user {}.'.format(pp(user_data))
-                    errors.append(str(e))
+                    errors.append("Tried user data to add:\n{}".format(pp(user_data)))
 
                 LOG.error("{c} adding user {u}: {e}".format(
                     c=e.__class__.__name__, u=pp(user_data), e=e))
