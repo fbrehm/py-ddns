@@ -21,6 +21,7 @@ from flask import jsonify
 from flask import request
 from flask import abort
 from flask import url_for
+from flask import redirect
 
 try:
     from flask import _app_ctx_stack as stack
@@ -147,9 +148,8 @@ def api_cur_user_patch():
 
 #------------------------------------------------------------------------------
 @api.route('/api/v1/cur_user/password', methods=['PATCH'])
-@api.route('/api/v1/cur_user/password/<password>', methods=['PATCH'])
 @requires_auth
-def api_cur_user_set_pwd(password):
+def api_cur_user_set_pwd():
     ctx = stack.top
 
     url_base = url_for('.index', _external=True)
@@ -157,7 +157,7 @@ def api_cur_user_set_pwd(password):
 
     user_id = ctx.cur_user.user_id
 
-    new_pwd = password
+    new_pwd = None
     if 'password' in request.values:
         new_pwd = request.values['password']
     elif 'new_password' in request.values:
@@ -210,6 +210,14 @@ def api_cur_user_set_pwd(password):
 
     return gen_response(info)
 
+
+#------------------------------------------------------------------------------
+@api.route('/api/v1/cur_user/password/<password>', methods=['PATCH'])
+@requires_auth
+def api_cur_user_set_pwd_path(password):
+    ctx = stack.top
+
+    return redirect('api/v1/cur_user/password?password={}'.format(password), code=307)
 
 #------------------------------------------------------------------------------
 @api.route('/api/v1/user')
@@ -539,7 +547,7 @@ def check_userdata(complete=False, restricted=False):
             if pwd_errors:
                 LOG.warn("Got some password check warnings:\n{}".format(pp(pwd_errors)))
             salt = crypt.mksalt(crypt.METHOD_SHA512)
-            enc_pwd = crypt.crypt(new_pwd, salt)
+            enc_pwd = crypt.crypt(request.values['password'], salt)
             user_data['passwd'] = enc_pwd
     elif complete:
         errors.append("No new password given for user.")
@@ -654,7 +662,8 @@ def api_add_user():
     info = User.add_user(user_data)
 
     if 'user' in info:
-        url += '/' + str(info['user'].user_id)
+        LOG.debug("Got new user:\n{}".format(pp(info['user'])))
+        url += '/' + str(info['user']['user_id'])
         info['user']['url']= url
         if 'created' in info['user'] and info['user']['created']:
             info['user']['created'] = info['user']['created'].isoformat(' ')

@@ -217,6 +217,8 @@ class User(Base):
 
             except SQLAlchemyError as e:
                 db_session.rollback()
+                log_msg = "{c} updating data of user {i}: {e}\nUpdate data:\n{u}".format(
+                    i=str(user_id), n=updates['user_name'])
                 if 'user_name' in updates and e.__class__.__name__ == 'IntegrityError':
                     msg = 'Could not change data of user {i!r} - username {n!r} already exists.'.format(
                         i=str(user_id), n=updates['user_name'])
@@ -224,8 +226,7 @@ class User(Base):
                         'status': 400,
                         'response': msg,
                     }
-                    LOG.debug("{c} updating data of user {i}: {e}\nUpdate data:\n{u}".format(
-                        c=e.__class__.__name__, i=user_id, e=e, u=pp(updates)))
+                    LOG.debug(log_msg)
                 else:
                     msg = 'Could not change data of user {!r} - internal error.'.format(str(user_id))
                     updates['modified'] = 'CURRENT_TIMESTAMP'
@@ -234,8 +235,7 @@ class User(Base):
                         'response': msg,
                         'errors': ["Tried user data to change:\n{}".format(pp(updates))]
                     }
-                    LOG.error("{c} updating data of user {i}: {e}\nUpdate data:\n{u}".format(
-                        c=e.__class__.__name__, i=user_id, e=e, u=pp(updates)))
+                    LOG.error(log_msg)
                 return info
 
         user = cls.get_user(user_id)
@@ -261,9 +261,10 @@ class User(Base):
 
         errors = []
         # Check for necessary fields
-        for field in ('user_name', 'password', 'full_name', 'email'):
+        for field in ('user_name', 'passwd', 'full_name', 'email'):
             if not field in user_data:
                 errors.append("Field {!r} not given.".format(field))
+                LOG.error("Field {!r} not given.".format(field))
 
         response = None
         status = 'OK'
@@ -283,14 +284,15 @@ class User(Base):
                 db_session.rollback()
                 status = 500
                 response = 'Could not add user with name {!r}.'.format(name)
+                msg = "{c} adding user {u}: {e}".format(
+                    c=e.__class__.__name__, u=pp(user_data), e=e)
                 if e.__class__.__name__ == 'IntegrityError':
                     status = 400
                     errors.append('There is already existing a user with this name.')
+                    LOG.debug(msg)
                 else:
                     errors.append("Tried user data to add:\n{}".format(pp(user_data)))
-
-                LOG.error("{c} adding user {u}: {e}".format(
-                    c=e.__class__.__name__, u=pp(user_data), e=e))
+                    LOG.error(msg)
 
             else:
                 new_user = cls.get_user(name)
