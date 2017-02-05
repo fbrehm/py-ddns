@@ -25,6 +25,9 @@ GLOBAL_CONFIG_FILE = os.path.join(GLOBAL_CONFIG_DIR, 'dyndns.json')
 GLOBAL_LOGGING_CONFIG = os.path.join(GLOBAL_CONFIG_DIR, "logging.json")
 
 CONFIG = {
+    'default_list_limit': {
+        'type': 'int', 'default': 10,
+        'description': 'Default limit for longer lists, of not set otherwise.'},
     'default_user_max_hosts': {
         'type': 'int', 'default': 3,
         'description': 'Default value for maximal hosts for users.'},
