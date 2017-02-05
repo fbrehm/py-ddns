@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS users (
     created timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
     modified timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
     description text,
+    list_limit integer,
     CONSTRAINT unique_user_name UNIQUE(user_name)
 );
 
@@ -21,12 +22,12 @@ CREATE TABLE IF NOT EXISTS users (
 INSERT INTO users (
     user_name, full_name, email,
     passwd,
-    is_admin, is_sticky, max_hosts, description
+    is_admin, is_sticky, max_hosts, description, list_limit
 )
 VALUES (
     'admin', 'Administrator', 'webmaster@brehm-online.com',
     '$6$jQbHxAyrUw.c3M5g$CtaKH7BouFOPXLN.YL3zYpxB.sGi6WBUYKREsfHQ5fdJ99Wli6gGujtZgPADRcU0S0RvSCMh69iTY0SrAeeFD0',
-    True, True, NULL, 'The default administrator of this application.'
+    True, True, NULL, 'The default administrator of this application.', NULL
 );
 
 COMMIT;

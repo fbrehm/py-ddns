@@ -5,36 +5,36 @@ BEGIN WORK;
 INSERT INTO users (
     user_name, full_name, email,
     passwd,
-    is_admin, is_sticky, max_hosts, description
+    is_admin, is_sticky, max_hosts, description, list_limit
 )
 VALUES (
     'frank', 'Frank Brehm', 'frank@brehm-online.com',
     '$5$Z1yIznlyCUYxG$6j92inq.66TkhfUCf0gLqNHDgyXrlKOzsQ1fISeaS.D',
-    True, False, NULL, 'Ich höchstpersönlich.'
+    True, False, NULL, 'Ich höchstpersönlich.', NULL
 );
 
 -- qqqq
 INSERT INTO users (
     user_name, full_name, email,
     passwd,
-    is_admin, is_sticky, max_hosts, description
+    is_admin, is_sticky, max_hosts, description, list_limit
 )
 VALUES (
     'thomas', 'Thomas Schmidt', 'thomas@nexunus.net',
     '$6$2ZG/G/Rzm$XmlHtFmQrLjU7LnCoQBmeMkvFhMTY..9HbR8ttSlHGVpOmAhSxofJV8Q/ltZmv1dM1mTDn8xLzofyQAZ.UqWv0',
-    True, False, NULL, 'Der andere.'
+    True, False, NULL, 'Der andere.', NULL
 );
 
 -- uhu
 INSERT INTO users (
     user_name, full_name, email,
     passwd,
-    is_admin, is_sticky, max_hosts, description
+    is_admin, is_sticky, max_hosts, description, list_limit
 )
 VALUES (
     'guest', 'Gast', 'nobody@nexunus.net',
     '$6$gZNaI3.a/t$fikdw22JjIyVwKcHbMKYRZxHRkavrFvtRZyyIIhqb.DBJj2aArjS4BD6/.bv565WkKh4CSVBX28S1yD963YVS/',
-    False, False, 3, 'Gastnutzer ohne Rechte'
+    False, False, 3, 'Gastnutzer ohne Rechte', NULL
 );
 
 INSERT INTO tsig_keys (

@@ -59,12 +59,13 @@ class User(Base):
         DateTime(timezone=True), nullable=False,
         server_default=text('CURRENT_TIMESTAMP'))
     description = Column(Text, nullable=True)
+    list_limit = Column(INTEGER, nullable=True)
 
     # -----------------------------------------------------
     def __init__(
         self, user_id=None, user_name=None, full_name=None, email=None,
             passwd=None, is_admin=False, is_sticky=False, max_hosts=3,
-            disabled=False, created=None, modified=None, description=None):
+            disabled=False, created=None, modified=None, description=None, list_limit=None):
 
         self.user_id = user_id
         self.user_name = user_name
@@ -78,6 +79,7 @@ class User(Base):
         self.created = created
         self.modified = modified
         self.description = description
+        self.list_limit = list_limit
 
     # -----------------------------------------------------
     def __repr__(self):
