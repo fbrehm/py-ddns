@@ -75,8 +75,16 @@ def api_cur_user():
             'email': ctx.cur_user.email,
             'max_hosts': ctx.cur_user.max_hosts,
             'created': ctx.cur_user.created.isoformat(' '),
+            'list_limit': ctx.cur_user.list_limit,
         }
     }
+    if not ctx.cur_user.list_limit:
+        try:
+            limit = '[{}]'.format(Config.get('default_list_limit').value)
+        except ConfigNotFoundError as e:
+            LOG.error("Config parameter {!r} not found.".format('default_list_limit'))
+            limit = '<default>'
+        info['current_user']['list_limit'] = limit
     if ctx.cur_user.is_admin:
         url = url_for('.index', _external=True)
         if not url.endswith('/'):
@@ -413,23 +421,13 @@ def api_user_from_id(user_id):
     url_base = url_for('.index', _external=True)
     url_base += 'api/v1/user/'
 
+    u = user.to_namespace().__dict__
+    u['passwd'] = user.passwd[0:3] + ' ********'
+    u['url'] = url_base + str(user.user_id)
+
     info = {
         'status': 'OK',
-        'user': {
-            'id': user.user_id,
-            'user_name': user.user_name,
-            'full_name': user.full_name,
-            'email': user.email,
-            'passwd': user.passwd[0:3] + ' ********',
-            'is_admin': user.is_admin,
-            'is_sticky': user.is_sticky,
-            'max_hosts': user.max_hosts,
-            'disabled': user.disabled,
-            'created': user.created.isoformat(' '),
-            'modified': user.modified.isoformat(' '),
-            'description': user.description,
-            'url': url_base + str(user.user_id),
-        }
+        'user': u,
     }
     return gen_response(info)
 
@@ -526,7 +524,7 @@ def check_userdata(complete=False, restricted=False):
 
     valid_fields = (
         'user_name', 'password', 'full_name', 'email', 'max_hosts',
-        'is_admin', 'disabled', 'description')
+        'is_admin', 'disabled', 'description', 'list_limit')
 
     # Check for new username / loginname
     if 'user_name' in request.values:
@@ -630,6 +628,27 @@ def check_userdata(complete=False, restricted=False):
         vals = request.values.getlist(key)
         errors.append("Unknown field {f!r} with value {v} given.".format(
             f=key, v=pp(vals)))
+
+    # Checking for the list_limit value
+    if 'list_limit' in request.values:
+        ll = request.values['list_limit']
+        if empty_re.search(ll):
+            user_data['list_limit'] = None
+        else:
+            try:
+                ll = int(ll)
+            except ValueError as e:
+                errors.append("Invalid value {v!r} for list_limit: {e}".format(
+                    v=request.values['list_limit'], e=e))
+            else:
+                if ll < 0:
+                    errors.append("Invalid value {v!r} for list_limit: {e}".format(
+                        v=request.values['list_limit'],
+                        e="No negative values allowed."))
+                else:
+                    user_data['list_limit'] = ll
+    elif complete:
+        user_data['list_limit'] = None
 
     if errors:
         ok = False
