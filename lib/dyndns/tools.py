@@ -6,8 +6,13 @@ import copy
 import re
 import locale
 
+# Third party modules
+
 from six import PY2, PY3
 
+# Own modules
+
+# module variables
 RE_YES = re.compile(r'^\s*(?:y(?:es)?|true)\s*$', re.IGNORECASE)
 RE_NO = re.compile(r'^\s*(?:no?|false|off)\s*$', re.IGNORECASE)
 PAT_TO_BOOL_TRUE = locale.nl_langinfo(locale.YESEXPR)
@@ -154,7 +159,6 @@ def to_bool(value):
         return False
 
     return bool(value)
-
 
 
 # =============================================================================

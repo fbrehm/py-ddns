@@ -28,9 +28,16 @@ from sqlalchemy.orm.exc import FlushError
 
 # Own modules
 from . import Base
+
+from ..constants import CONFIG
+
 from ..namespace import Namespace
+
 from ..tools import pp
+
 from ..errors import UsernameExistsError
+
+from .config import Config
 
 LOG = logging.getLogger(__name__)
 
@@ -111,7 +118,7 @@ class User(Base):
 
     # -----------------------------------------------------
     @classmethod
-    def all_users(cls, enabled=None, is_admin=None):
+    def all_users(cls, enabled=None, is_admin=None, limit=None, offset=None):
 
         keys = []
 
@@ -134,6 +141,10 @@ class User(Base):
         q = cls.query.order_by(User.user_name)
         if filters:
             q = cls.query.filter_by(**filters).order_by(User.user_name)
+        if limit and limit > 1:
+            q = q.limit(limit)
+            if offset and offset > 0:
+                q = q.offset(offset)
 
         return q.all()
 
@@ -308,6 +319,21 @@ class User(Base):
             info['errors'] = errors
 
         return info
+
+# =============================================================================
+def get_current_list_limit():
+
+    ctx = stack.top
+    limit = CONFIG['default_list_limit']['default']
+
+    if (
+            hasattr(ctx, 'cur_user') and hasattr(ctx.cur_user, 'list_limit') and
+            ctx.cur_user.list_limit):
+        limit = ctx.cur_user.list_limit
+    else:
+        limit = Config.get('default_list_limit').value
+
+    return limit
 
 
 #==============================================================================

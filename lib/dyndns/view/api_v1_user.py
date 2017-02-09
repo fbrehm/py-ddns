@@ -36,7 +36,7 @@ from ..constants import CONFIG
 
 from ..tools import pp, to_bool
 
-from ..model.user import User
+from ..model.user import User, get_current_list_limit
 from ..model.config import Config
 
 from ..errors import UsernameExistsError
@@ -238,7 +238,20 @@ def api_all_users():
         abort(403)
 
     total_count = User.total_count()
-    users = User.all_users()
+
+    limit = get_current_list_limit()
+    if 'limit' in request.values:
+        get_limit = request.values.get('limit', type=int)
+        if get_limit > 1:
+            limit = get_limit
+    offset = None
+    if limit > 1:
+        if 'offset' in request.values:
+            offset = request.values.get('offset', type=int)
+            if offset < 1:
+                offset = None
+
+    users = User.all_users(limit=limit, offset=offset)
     url_base = url_for('.index', _external=True)
     url_base += 'api/v1/user/'
 
