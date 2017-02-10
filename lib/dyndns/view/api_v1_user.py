@@ -232,78 +232,9 @@ def api_cur_user_set_pwd_path(password):
 @api.route('/api/v1/users')
 @requires_auth
 def api_all_users():
-    ctx = stack.top
-    if not ctx.cur_user.is_admin:
-        # Forbidden, if not an administrator
-        abort(403)
 
-    url_base = url_for('.index', _external=True)
-    url_base += 'api/v1/user'
+    return generate_userlist()
 
-    total_count = User.total_count()
-    errors = []
-    emesg = "Wrong value {v!r} for parameter {p}: {e}"
-
-    limit = get_current_list_limit()
-    if 'limit' in request.values:
-        if empty_re.match(request.values['limit']):
-            limit = None
-        else:
-            try:
-                get_limit = int(request.values.get('limit'))
-            except ValueError as e:
-                errors.append(emesg.format(
-                    v=request.values['limit'], p='limit', e=e))
-            else:
-                if get_limit >= 1:
-                    limit = get_limit
-                elif get_limit == 0:
-                    limit = None
-                else:
-                    errors.append(emesg.format(
-                        v=get_limit, p='limit',
-                        e="The limit may not be negative."))
-
-    offset = None
-    if 'offset' in request.values:
-        if not empty_re.match(request.values['offset']):
-            try:
-                offset = int(request.values.get('offset'))
-            except ValueError as e:
-                errors.append(emesg.format(
-                    v=request.values['offset'], p='offset', e=e))
-            else:
-                if offset < 1:
-                    offset = None
-
-    if errors:
-        info = {
-            'status': 400,
-            'response': "Error(s) on getting user list.",
-            'errors': errors,
-            'url': url_base
-        }
-        return gen_response(info)
-
-    LOG.debug("Getting user list: limit {l!r}, offset {o!r}.".format(
-        l=limit, o=offset))
-
-    users = User.all_users(limit=limit, offset=offset)
-
-    info = {
-        'status': 'OK',
-        'users': [],
-        'total_count': total_count,
-        'count': len(users),
-    }
-
-    for user in users:
-        u = user.to_namespace(for_json=True).__dict__
-        u['passwd'] = user.passwd[0:3] + ' ********'
-        u['url'] = url_base + '/' + str(user.user_id)
-        info['users'].append(u)
-
-    return gen_response(info)
 
 #------------------------------------------------------------------------------
 @api.route('/api/v1/users/count')
@@ -328,58 +259,16 @@ def api_count_users():
 @api.route('/api/v1/users/admins')
 @requires_auth
 def api_all_admin_users():
-    ctx = stack.top
-    if not ctx.cur_user.is_admin:
-        # Forbidden, if not an administrator
-        abort(403)
 
-    total_count = User.total_count(is_admin=True)
-    users = User.all_users(is_admin=True)
-    url_base = url_for('.index', _external=True)
-    url_base += 'api/v1/user/'
-
-    info = {
-        'status': 'OK',
-        'users': [],
-        'total_count': total_count,
-    }
-
-    for user in users:
-        u = user.to_namespace(for_json=True).__dict__
-        u['passwd'] = user.passwd[0:3] + ' ********'
-        u['url'] = url_base + str(user.user_id)
-        info['users'].append(u)
-
-    return gen_response(info)
+    return generate_userlist(is_admin=True)
 
 
 #------------------------------------------------------------------------------
 @api.route('/api/v1/users/enabled')
 @requires_auth
 def api_all_enabled_users():
-    ctx = stack.top
-    if not ctx.cur_user.is_admin:
-        # Forbidden, if not an administrator
-        abort(403)
 
-    total_count = User.total_count(enabled=True)
-    users = User.all_users(enabled=True)
-    url_base = url_for('.index', _external=True)
-    url_base += 'api/v1/user/'
-
-    info = {
-        'status': 'OK',
-        'users': [],
-        'total_count': total_count,
-    }
-
-    for user in users:
-        u = user.to_namespace(for_json=True).__dict__
-        u['passwd'] = user.passwd[0:3] + ' ********'
-        u['url'] = url_base + str(user.user_id)
-        info['users'].append(u)
-
-    return gen_response(info)
+    return generate_userlist(enabled=True)
 
 
 #------------------------------------------------------------------------------
@@ -405,29 +294,8 @@ def api_count_enabled_users():
 @api.route('/api/v1/users/disabled')
 @requires_auth
 def api_all_disabled_users():
-    ctx = stack.top
-    if not ctx.cur_user.is_admin:
-        # Forbidden, if not an administrator
-        abort(403)
 
-    total_count = User.total_count(enabled=False)
-    users = User.all_users(enabled=False)
-    url_base = url_for('.index', _external=True)
-    url_base += 'api/v1/user/'
-
-    info = {
-        'status': 'OK',
-        'users': [],
-        'total_count': total_count,
-    }
-
-    for user in users:
-        u = user.to_namespace(for_json=True).__dict__
-        u['passwd'] = user.passwd[0:3] + ' ********'
-        u['url'] = url_base + str(user.user_id)
-        info['users'].append(u)
-
-    return gen_response(info)
+    return generate_userlist(enabled=False)
 
 
 #------------------------------------------------------------------------------
@@ -801,6 +669,88 @@ def api_update_user(user_id):
             info['user']['modified'] = info['user']['modified'].isoformat(' ')
     else:
         info['url'] = url
+
+    return gen_response(info)
+
+
+#------------------------------------------------------------------------------
+def generate_userlist(is_admin=None, enabled=None):
+    """Generates a list of all users (including some filter criteria)
+        and returns it as JSON."""
+
+    ctx = stack.top
+    if not ctx.cur_user.is_admin:
+        # Forbidden, if not an administrator
+        abort(403)
+
+    url_base = url_for('.index', _external=True)
+    url_base += 'api/v1/user'
+
+    total_count = User.total_count(is_admin=is_admin, enabled=enabled)
+    errors = []
+    emesg = "Wrong value {v!r} for parameter {p}: {e}"
+
+    limit = get_current_list_limit()
+    if 'limit' in request.values:
+        if empty_re.match(request.values['limit']):
+            limit = None
+        else:
+            try:
+                get_limit = int(request.values.get('limit'))
+            except ValueError as e:
+                errors.append(emesg.format(
+                    v=request.values['limit'], p='limit', e=e))
+            else:
+                if get_limit >= 1:
+                    limit = get_limit
+                elif get_limit == 0:
+                    limit = None
+                else:
+                    errors.append(emesg.format(
+                        v=get_limit, p='limit',
+                        e="The limit may not be negative."))
+
+    offset = None
+    if 'offset' in request.values:
+        if not empty_re.match(request.values['offset']):
+            try:
+                offset = int(request.values.get('offset'))
+            except ValueError as e:
+                errors.append(emesg.format(
+                    v=request.values['offset'], p='offset', e=e))
+            else:
+                if offset < 1:
+                    offset = None
+
+    if errors:
+        info = {
+            'status': 400,
+            'response': "Error(s) on getting user list.",
+            'errors': errors,
+            'url': url_base
+        }
+        return gen_response(info)
+
+    LOG.debug((
+        "Getting user list: limit {l!r}, offset {o!r}, "
+        "is_admin={a!r}, enabled={e!r}.").format(
+        l=limit, o=offset, a=is_admin, e=enabled))
+
+    users = User.all_users(
+        is_admin=is_admin, enabled=enabled, limit=limit, offset=offset)
+
+    info = {
+        'status': 'OK',
+        'users': [],
+        'total_count': total_count,
+        'count': len(users),
+    }
+
+    for user in users:
+        u = user.to_namespace(for_json=True).__dict__
+        u['passwd'] = user.passwd[0:3] + ' ********'
+        u['url'] = url_base + '/' + str(user.user_id)
+        info['users'].append(u)
 
     return gen_response(info)
 
