@@ -105,7 +105,7 @@ class User(Base):
         return out
 
     # -----------------------------------------------------
-    def to_namespace(self):
+    def to_namespace(self, for_json=False):
 
         user_ns = Namespace()
         for key in self.__dict__:
@@ -114,6 +114,11 @@ class User(Base):
                 if key == 'user_id':
                     val = uuid.UUID(val)
                 setattr(user_ns, key, val)
+        if for_json:
+            if self.created:
+                user_ns.created = self.created.isoformat(' ')
+            if self.created:
+                user_ns.modified = self.modified.isoformat(' ')
         return user_ns
 
     # -----------------------------------------------------

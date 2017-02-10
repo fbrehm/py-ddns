@@ -262,7 +262,7 @@ def api_all_users():
     }
 
     for user in users:
-        u = user.to_namespace().__dict__
+        u = user.to_namespace(for_json=True).__dict__
         u['passwd'] = user.passwd[0:3] + ' ********'
         u['url'] = url_base + str(user.user_id)
         info['users'].append(u)
@@ -309,7 +309,7 @@ def api_all_admin_users():
     }
 
     for user in users:
-        u = user.to_namespace().__dict__
+        u = user.to_namespace(for_json=True).__dict__
         u['passwd'] = user.passwd[0:3] + ' ********'
         u['url'] = url_base + str(user.user_id)
         info['users'].append(u)
@@ -338,7 +338,7 @@ def api_all_enabled_users():
     }
 
     for user in users:
-        u = user.to_namespace().__dict__
+        u = user.to_namespace(for_json=True).__dict__
         u['passwd'] = user.passwd[0:3] + ' ********'
         u['url'] = url_base + str(user.user_id)
         info['users'].append(u)
@@ -386,7 +386,7 @@ def api_all_disabled_users():
     }
 
     for user in users:
-        u = user.to_namespace().__dict__
+        u = user.to_namespace(for_json=True).__dict__
         u['passwd'] = user.passwd[0:3] + ' ********'
         u['url'] = url_base + str(user.user_id)
         info['users'].append(u)
@@ -434,7 +434,7 @@ def api_user_from_id(user_id):
     url_base = url_for('.index', _external=True)
     url_base += 'api/v1/user/'
 
-    u = user.to_namespace().__dict__
+    u = user.to_namespace(for_json=True).__dict__
     u['passwd'] = user.passwd[0:3] + ' ********'
     u['url'] = url_base + str(user.user_id)
 
