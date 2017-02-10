@@ -44,7 +44,7 @@ LOG = logging.getLogger(__name__)
 
 
 #------------------------------------------------------------------------------
-@api.route('/api/v1/zone')
+@api.route('/api/v1/all_zones')
 @requires_auth
 def api_all_zones():
     ctx = stack.top
@@ -67,6 +67,7 @@ def api_all_zones():
     return gen_response(info)
 
 #------------------------------------------------------------------------------
+@api.route('/api/v1/zone')
 @api.route('/api/v1/zones')
 @requires_auth
 def api_all_zones_ext():
@@ -83,24 +84,7 @@ def api_all_zones_ext():
         'count': len(zones)
     }
     for zone in zones:
-        #LOG.debug("Got zone:\n{}".format(zone.to_namespace().__dict__))
-        z = {
-            'id': zone.zone_id,
-            'zone_name': zone.zone_name,
-            'master_ns': zone.master_ns,
-            'key_id': zone.key_id,
-            'key_name': zone.key_name,
-            'key_value': zone.key_value,
-            'max_hosts': zone.max_hosts,
-            'default_min_wait': None,
-            'disabled': zone.disabled,
-            'created': zone.created.isoformat(' '),
-            'modified': zone.modified.isoformat(' '),
-            'description': zone.description,
-        }
-        if zone.default_min_wait is not None:
-            z['default_min_wait'] = zone.default_min_wait.total_seconds()
-        #LOG.debug("Got zone:\n{}".format(pp(z)))
+        z = zone.to_namespace(for_json=True).__dict__
         info['zones'].append(z)
 
     LOG.debug("All zones:\n{}".format(pp(info)))

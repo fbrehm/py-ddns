@@ -84,14 +84,21 @@ class Zone(Base):
         return out
 
     # -----------------------------------------------------
-    def to_namespace(self):
+    def to_namespace(self, for_json=False):
 
-        user_ns = Namespace()
+        zone_ns = Namespace()
         for key in self.__dict__:
             if not key.startswith('_'):
                 val = self.__dict__[key]
-                setattr(user_ns, key, val)
-        return user_ns
+                setattr(zone_ns, key, val)
+        if for_json:
+            if self.created:
+                zone_ns.created = self.created.isoformat(' ')
+            if self.created:
+                zone_ns.modified = self.modified.isoformat(' ')
+            if self.default_min_wait is not None:
+                zone_ns.default_min_wait = self.default_min_wait.total_seconds()
+        return zone_ns
 
 #------------------------------------------------------------------------------
 class ZoneView(Base):
@@ -150,13 +157,20 @@ class ZoneView(Base):
         return out
 
     # -----------------------------------------------------
-    def to_namespace(self):
+    def to_namespace(self, for_json=False):
 
         zone_ns = Namespace()
         for key in self.__dict__:
             if not key.startswith('_'):
                 val = self.__dict__[key]
                 setattr(zone_ns, key, val)
+        if for_json:
+            if self.created:
+                zone_ns.created = self.created.isoformat(' ')
+            if self.created:
+                zone_ns.modified = self.modified.isoformat(' ')
+            if self.default_min_wait is not None:
+                zone_ns.default_min_wait = self.default_min_wait.total_seconds()
         return zone_ns
 
     # -----------------------------------------------------
