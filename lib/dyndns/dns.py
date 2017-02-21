@@ -13,10 +13,16 @@ import os
 import logging
 import re
 
+# Third party modules
+import dns.resolver
+
+from dns.resolver import NoAnswer, NXDOMAIN
+from dns.name import Name
+
 # Own modules
 from .tools import pp
 
-__version__ = '0.2.0'
+__version__ = '0.3.0'
 LOG = logging.getLogger(__name__)
 
 
@@ -27,6 +33,7 @@ class DnsZone(object):
     """
 
     verbose = 0
+    root_zone = Name(('', ))
 
     # -------------------------------------------------------------------------
     def __init__(self, name, master_ns=None, key_name=None, key_value=None):
@@ -87,7 +94,6 @@ class DnsZone(object):
         out += ", ".join(fields) + ")>"
         return out
 
-
     # -------------------------------------------------------------------------
     def as_dict(self):
         """
@@ -114,7 +120,29 @@ class DnsZone(object):
 
         return res
 
+    # -------------------------------------------------------------------------
+    def get_soa(self):
+        """Returns the SOA record (Start of authority) for this zone."""
 
+        LOG.debug("Trying to get SOA for zone {!r} ...".format(self.name))
+        answers = dns.resolver.query(self.name, 'SOA')
+        return answers[0]
+
+    # -------------------------------------------------------------------------
+    def check_usable(self):
+
+        try:
+            soa = self.get_soa()
+        except NXDOMAIN as e:
+            msg = "Zone {z!r} does not exists: {e}".format(z=self.name, e=e)
+            return [msg]
+        except NoAnswer as e:
+            msg = "Got no SOA record for zone {!r}.".format(self.name)
+            return [msg]
+        LOG.debug("Got SOA for zone {z!r}: {s}".format(
+            z=self.name, s=soa.to_text(origin=self.root_zone)))
+
+        return []
 
 # =============================================================================
 

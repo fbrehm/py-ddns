@@ -183,8 +183,12 @@ def check_zone(zone_data, must_exists=None):
         msg = "No TSIG key_id given in zone_data:\n{}".format(pp(zone_data))
         return [msg]
 
-    zone = DnsZone(name=zone_name, master_ns=master_ns, key_name=key_name, key_value=key_value)
-    LOG.debug("Checking zone {!r} ...".format(zone))
+    if not db_zone or db_zone.disabled:
+        zone = DnsZone(name=zone_name, master_ns=master_ns, key_name=key_name, key_value=key_value)
+        LOG.debug("Checking zone {!r} ...".format(zone))
+        dns_errors = zone.check_usable()
+        if dns_errors:
+            zone_errors += dns_errors
 
     return zone_errors
 
