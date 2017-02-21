@@ -195,6 +195,19 @@ class ZoneView(Base):
 
         return q.all()
 
+    # -----------------------------------------------------
+    @classmethod
+    def get_by_name(cls, zone_name):
+
+        LOG.debug("Searching zone name {!r} ...".format(zone_name))
+        return cls.query.filter(cls.zone_name == str(zone_name).lower()).first()
+
+    # -----------------------------------------------------
+    @classmethod
+    def get_by_id(cls, zone_id):
+
+        LOG.debug("Searching zone by Id {!r} ...".format(zone_id))
+        return cls.query.filter(cls.zone_id == int(zone_id)).first()
 
 
 #==============================================================================

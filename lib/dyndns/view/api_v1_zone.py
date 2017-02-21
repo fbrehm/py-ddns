@@ -37,7 +37,7 @@ from ..model.zone import Zone, ZoneView
 
 from ..tools import to_bool, pp
 
-from ..dns import Zone
+from ..dns import DnsZone
 
 from . import api
 from . import requires_auth
@@ -94,7 +94,7 @@ def api_all_zones_ext():
 
     return gen_response(info)
 
-#------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 @api.route('/api/v1/zone', methods=['POST'])
 @requires_auth
 def api_add_zone():
@@ -109,7 +109,9 @@ def api_add_zone():
     (ok, zone_data, errors) = check_zonedata(complete=True)
 
     if not errors:
-        zone = Zone(name=zone_data['zone_name'], master_ns=zone_data['master_ns'])
+        zone_errors = check_zone(zone_data, must_exists=False)
+        if zone_errors:
+            errors += zone_errors
 
     if not ok or errors:
         info = {
@@ -130,7 +132,63 @@ def api_add_zone():
     return gen_response(info)
 
 
-#------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+def check_zone(zone_data, must_exists=None):
+
+    zone_errors = []
+
+    db_zone = None
+    zone_id = None
+    zone_name = None
+    zid = None
+    master_ns = None
+    key_name = None
+    key_value = None
+
+    if 'zone_id' in zone_data:
+        zone_id = int(zone_data['zone_id'])
+        zid = zone_id
+        db_zone = ZoneView.get_by_id(zone_id)
+    elif 'zone_name' in zone_data:
+        zone_name = zone_data['zone_name'].lower()
+        zid = zone_name
+        db_zone = ZoneView.get_by_name(zone_name)
+    else:
+        msg = "Neither zone_id nor zone_name are given in zone_data:\n{}".format(pp(zone_data))
+        return [msg]
+
+    if must_exists is not None:
+        if must_exists and db_zone is None:
+            msg = "Zone {!r} does not exists.".format(zid)
+            return [msg]
+        if not must_exists and db_zone:
+            msg = "Zone {!r} already exists.".format(db_zone.zone_name)
+            return [msg]
+
+    if db_zone:
+        zone_id = db_zone.zone_id
+        zone_name = db_zone.zone_name
+        key_name = db_zone.key_name
+        key_value = db_zone.key_value
+    elif 'key_id' in zone_data:
+        key_id = zone_data['key_id']
+        key = TsigKey.get_key_by_id(key_id)
+        if key:
+            key_name = key.key_name
+            key_value = key.key_value
+        else:
+            msg = "TSIG key with Id {!r} not found.".format(key_id)
+            return [msg]
+    else:
+        msg = "No TSIG key_id given in zone_data:\n{}".format(pp(zone_data))
+        return [msg]
+
+    zone = DnsZone(name=zone_name, master_ns=master_ns, key_name=key_name, key_value=key_value)
+    LOG.debug("Checking zone {!r} ...".format(zone))
+
+    return zone_errors
+
+# -----------------------------------------------------------------------------
 def check_zonedata(complete=False):
     """
     Checking the validity of given data about a zone.
