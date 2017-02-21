@@ -37,6 +37,8 @@ from ..model.zone import Zone, ZoneView
 
 from ..tools import to_bool, pp
 
+from ..dns import Zone
+
 from . import api
 from . import requires_auth
 from . import gen_response
@@ -106,10 +108,13 @@ def api_add_zone():
 
     (ok, zone_data, errors) = check_zonedata(complete=True)
 
+    if not errors:
+        zone = Zone(name=zone_data['zone_name'], master_ns=zone_data['master_ns'])
+
     if not ok or errors:
         info = {
             'status': 400,
-            'response': "Error on new user.",
+            'response': "Error on new zone.",
             'errors': errors,
             'url': url
         }
